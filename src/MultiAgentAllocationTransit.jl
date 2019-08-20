@@ -16,6 +16,7 @@ using CSV
 using DataFrames
 using Distances
 using NearestNeighbors
+using IterTools
 
 # Custom
 using TOML
@@ -32,7 +33,11 @@ export
     parse_city_params,
     TransitGraph,
     OffTransitGraph,
-    MAPFTransitEnv
+    MAPFTransitEnv,
+    MAPFTransitState,
+    MAPFTransitAction,
+    MAPFTransitConflict,
+    MAPFTransitConstraints
 
 # Utils
 export

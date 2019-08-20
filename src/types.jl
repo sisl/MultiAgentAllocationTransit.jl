@@ -44,25 +44,31 @@ end
 
 
 
-
+# Strings are "d-1", "d-2" etc., "s-1", "s-2" etc and "r-1-1", "r-1-2", ... "r-2-1" etc.
 @with_kw struct MAPFTransitState <: MAPFState
     time::Float64       # Planned time to be at the vertex. For routewaypoint, should be before ETA
     vertex_str::String  # The actual vertex string ID (TG or OTG); used with get_location_or_routept
 end
 
+Base.isequal(s1::MAPFTransitState, s2::MAPFTransitState) = (s1.time, s1.vertex_str) == (s2.time, s2.vertex_str)
+
+@enum ActionType Stay=1 Fly=2 Board=3
+
 # Empty struct - action implicit
 struct MAPFTransitAction <: MAPFAction
+    action::ActionType
 end
 
 
 # Board Conflict - Two drones go to the same ROUTE waypoint
 # Capacity Conflict - A transit route has more drones than it can accommodate
-@enum ConflictType Board=1 Capacity=2
+@enum ConflictType Transfer=1 Capacity=2
 
 @with_kw struct MAPFTransitConflict <: MAPFConflict
-    time::Float64
     type::ConflictType
-    overlaps::Dict{Int64,Tuple{String,String}}  # Maps agent ID to overlapping subroutes
+    overlap_vertices::Set{String}
+    overlap_agents::Set{Int64}  # Maps agent ID to overlapping subroutes
+    cap::Int64                      = 1
 end
 
 # Vertex Constraints are basically MAPFTransitState instances for depot/sites
@@ -79,10 +85,13 @@ function Graphs.vertex_index(g::SimpleVListGraph{MAPFTransitVertexState}, v::MAP
     return v.idx
 end
 
+const AgentTask = NamedTuple{(:origin, :site, :dest)}
+
 @with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph, TG <: TransitGraph, NN <: NNTree}
     off_transit_graph::OTG
     transit_graph::TG
     state_graph::SimpleVListGraph{MAPFTransitVertexState}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
+    agent_tasks::Vector{AgentTask}
     depot_sites_to_vtx::Dict{String,Int64}                          # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
     stops_nn_tree::NN                                               # Nearest neighbor tree for stop locations
     nn_idx_to_stop::Vector{Int64}                                   # Maps the ID from NNTree to stop id
@@ -92,14 +101,14 @@ end
 
 
 # Split by depot or site (Location) OR route point (RouteWayPoint)
-function get_location_or_routept(pg::ProblemGraph, vtx_id::String)
-
-    splitstr = split(vtx_id, "-")
-    if splitstr[1] == "d"
-        return pg.off_transit_graph.depots[parse(Int64, splitstr[2])]
-    elseif splitstr[1] == "s"
-        return pg.off_transit_graph.sites[parse(Int64, splitstr[2])]
-    else
-        return pg.transit_graph.transit_routes[parse(Int64, splitstr[2])][parse(Int64, splitstr[3])]
-    end
-end
+# function get_location_or_routept(pg::ProblemGraph, vtx_id::String)
+#
+#     splitstr = split(vtx_id, "-")
+#     if splitstr[1] == "d"
+#         return pg.off_transit_graph.depots[parse(Int64, splitstr[2])]
+#     elseif splitstr[1] == "s"
+#         return pg.off_transit_graph.sites[parse(Int64, splitstr[2])]
+#     else
+#         return pg.transit_graph.transit_routes[parse(Int64, splitstr[2])][parse(Int64, splitstr[3])]
+#     end
+# end
