@@ -90,3 +90,36 @@ function get_stop_idx_to_trip_ids(tg::TG) where {TG <: TransitGraph}
 
     return stop_idx_to_trips
 end
+
+function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, stops_nn_tree::NNTree,
+                                       nn_idx_to_stop::Vector{Int64}, stop_idx_to_trips::Dict{Int64,Set{Int64}},
+                                       trips_fws_dists::Matrix{Float64})
+
+    depot_to_sites_dists = zeros(length(otg.depots), length(otg.sites))
+
+    for (d, depot_loc) in enumerate(otg.depots)
+        for (s, site_loc) in enumerate(otg.sites)
+
+            depot_vect = convert_to_vector(depot_loc)
+            d_nn_idx, d_nn_dist = knn(stops_nn_tree, depot_vect, 1)
+            d_nn_stop = nn_idx_to_stop[d_nn_idx]
+
+            site_vect = convert_to_vector(site_loc)
+            s_nn_idx, s_nn_dist = knn(stops_nn_tree, site_vect, 1)
+            s_nn_stop = nn_idx_to_stop[s_nn_idx]
+
+            min_trip_to_trip = Inf
+            for d_nn_trip_id in stop_idx_to_trips[d_nn_stop]
+                for s_nn_trip_id in stop_idx_to_trips[s_nn_stop]
+                    min_trip_to_trip = (trips_fws_dists[d_nn_trip_id, s_nn_trip_id] < min_trip_to_trip) ? trips_fws_dists[d_nn_trip_id, s_nn_trip_id] : min_trip_to_trip
+                end
+            end
+
+            depot_to_sites_dists[d, s] = d_nn_dist + s_nn_dist + min_trip_to_trip
+            depot_to_sites_dists[s, d] = depot_to_sites_dists[d, s]
+        end
+    end
+
+    return depot_to_sites_dists
+
+end

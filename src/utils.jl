@@ -4,7 +4,7 @@
 Compute the Euclidean distance between two lat-long coordinates close to each other.
 Distance in km
 """
-function distance_lat_lon_euclidean(coords1::LatLongCoords, coords2::LatLongCoords)
+function distance_lat_lon_euclidean(coords1::LatLonCoords, coords2::LatLonCoords)
     deglen = 110.25
     x = coords1.lat - coords2.lat
     y = (coords1.lon - coords2.lon)*cos(coords2.lat)
@@ -12,7 +12,7 @@ function distance_lat_lon_euclidean(coords1::LatLongCoords, coords2::LatLongCoor
 end
 
 
-function is_in_bounds(params::CityParams, coords::LatLongCoords)
+function is_in_bounds(params::CityParams, coords::LatLonCoords)
 
     return (coords.lat >= params.lat_start && coords.lat <= params.lat_end) &&
             (coords.lon >= params.lon_start && coords.lon <= params.lon_end)
@@ -28,17 +28,17 @@ function hhmmss_to_seconds(time_str::String)
 end
 
 ## coords_bb - low and hi are the lower and upper corners respectively
-function generate_sites(coords_bb_lo::LatLongCoords, coords_bb_hi::LatLongCoords,
+function generate_sites(coords_bb_lo::LatLonCoords, coords_bb_hi::LatLonCoords,
                         n_sites::Int64, rng::RNG) where {RNG <: AbstractRNG}
 
-    sites = Vector{LatLongCoords}(undef, n_sites)
+    sites = Vector{LatLonCoords}(undef, n_sites)
 
     for i = 1:n_sites
 
         lat_dist = Uniform(coords_bb_lo.lat, coords_bb_hi.lat)
         lon_dist = Uniform(coords_bb_lo.lon, coords_bb_hi.lon)
 
-        sites[i] = LatLongCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist)))
+        sites[i] = LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist)))
 
     end
 
@@ -55,29 +55,29 @@ function load_depots(depot_file::String)
 
     n_depots = length(collect(keys(depot_dict)))
 
-    depots = Vector{LatLongCoords}(undef, n_depots)
+    depots = Vector{LatLonCoords}(undef, n_depots)
 
     # Enforcing keys to be integers
     for (idx_str, latlon) in depot_dict
         idx = parse(Int64, id_str)
-        depots[idx] = LatLongCoords((lat = latlon["lat"], lon = latlon["lon"]))
+        depots[idx] = LatLonCoords((lat = latlon["lat"], lon = latlon["lon"]))
     end
 
     return depots
 end
 
 
-function load_stop_to_location(::Type{LatLongCoords}, stop_coord_file::String)
+function load_stop_to_location(::Type{LatLonCoords}, stop_coord_file::String)
 
     stop_coord_dict = Dict()
     open(stop_coord_file, "r") do f
         stop_coord_dict = JSON.parse(f)
     end
 
-    stop_to_location = Dict{Int64,LatLongCoords}()
+    stop_to_location = Dict{Int64,LatLonCoords}()
 
     for (id_str, latlon) in stop_coord_dict
-        stop_to_location[parse(Int64, id_str)] = LatLongCoords((lat = latlon["lat"], lon = latlon["lon"]))
+        stop_to_location[parse(Int64, id_str)] = LatLonCoords((lat = latlon["lat"], lon = latlon["lon"]))
     end
 
     return stop_to_location

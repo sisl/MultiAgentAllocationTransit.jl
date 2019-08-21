@@ -26,11 +26,13 @@ using MultiAgentPathFinding
 # Types
 export
     Location2D,
-    LatLongCoords,
+    LatLonCoords,
     convert_to_vector,
     vector_type,
     CityParams,
     parse_city_params,
+    DroneParams,
+    parse_drone_params,
     TransitGraph,
     OffTransitGraph,
     MAPFTransitEnv,
@@ -58,10 +60,27 @@ export
     generate_stop_file,
     generate_trip_file
 
+
+# Preprocessing
+export
+    trip_meta_graph_fws_dists,
+    stop_locations_nearest_neighbors,
+    get_stop_idx_to_trip_ids,
+    generate_depot_to_sites_dists
+
+# Load Transit Env
+export
+    load_depot_site_locations_latlong,
+    load_off_transit_graph_latlong,
+    load_transit_graph_latlong,
+    setup_state_graph
+
+
 include("types.jl")
 include("utils.jl")
 include("gtfs_parser.jl")
 include("preprocessing.jl")
 include("mapf_transit.jl")
+include("load_transit_env.jl")
 
 end # module

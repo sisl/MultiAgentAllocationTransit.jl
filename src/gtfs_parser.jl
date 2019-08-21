@@ -3,7 +3,7 @@ function generate_stop_file(stop_txt::String, params::CityParams, out_file::Stri
     stop_file = CSV.File(stop_txt)
 
     n_stops = length(stop_file.stop_id)
-    stops_dict = Dict{Int64,LatLongCoords}()
+    stops_dict = Dict{Int64,LatLonCoords}()
 
     for (i, id_str) in enumerate(stop_file.stop_id)
 
@@ -19,7 +19,7 @@ function generate_stop_file(stop_txt::String, params::CityParams, out_file::Stri
             end
 
             @assert haskey(stops_dict, id) == false
-            coords = LatLongCoords((lat = stop_file.stop_lat[i], lon = stop_file.stop_lon[i]))
+            coords = LatLonCoords((lat = stop_file.stop_lat[i], lon = stop_file.stop_lon[i]))
 
             if is_in_bounds(params, coords)
                 stops_dict[id] = coords
@@ -41,7 +41,7 @@ end
 ## Ignore trips with any stops outside bounding box
 ## Save trips with zero-relative time in another file
 function generate_trip_file(route_txt::String, trip_txt::String,
-                            stop_time_txt::String, stop_coords::Dict{Int64,LatLongCoords},
+                            stop_time_txt::String, stop_coords::Dict{Int64,LatLonCoords},
                             out_file::String, rng::RNG) where {RNG <: AbstractRNG}
 
     route_df = CSV.read(route_txt)

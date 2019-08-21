@@ -1,11 +1,11 @@
 const Location2D = SVector{2, Float64}
-const LatLongCoords = NamedTuple{(:lat, :lon)}
+const LatLonCoords = NamedTuple{(:lat, :lon)}
 
-function convert_to_vector(c::LatLongCoords)
+function convert_to_vector(c::LatLonCoords)
     return Location2D(c.lat, c.lon)
 end
 
-vector_type(::Type{LatLongCoords}) = Location2D
+vector_type(::Type{LatLonCoords}) = Location2D
 
 @with_kw struct RouteWaypoint
     stop_id::Int64
@@ -14,8 +14,8 @@ end
 
 
 @with_kw struct OffTransitGraph{LOC}
-    depots::Vector{LOC} = Vector{LOC}(undef, 0)
-    sites::Vector{LOC}  = Vector{LOC}(undef, 0)
+    depots::Vector{LOC}
+    sites::Vector{LOC}
 end
 
 # The integer keys are consistent across routes and metadata
@@ -43,14 +43,32 @@ function parse_city_params(param_file::String)
 end
 
 
-
-# Strings are "d-1", "d-2" etc., "s-1", "s-2" etc and "r-1-1", "r-1-2", ... "r-2-1" etc.
-@with_kw struct MAPFTransitState <: MAPFState
-    time::Float64       # Planned time to be at the vertex. For routewaypoint, should be before ETA
-    vertex_str::String  # The actual vertex string ID (TG or OTG); used with get_location_or_routept
+@with_kw struct DroneParams
+    max_distance::Float64
+    max_air_time::Float64
+    avg_speed::Float64
+    stop_buffer_time::Float64
 end
 
-Base.isequal(s1::MAPFTransitState, s2::MAPFTransitState) = (s1.time, s1.vertex_str) == (s2.time, s2.vertex_str)
+function parse_drone_params(param_file::String)
+
+    params_dict = TOML.parsefile(param_file)
+
+    return DroneParams(max_distance = params_dict["MAX_DISTANCE"],
+                       max_air_time = params_dict["MAX_AIR_TIME"],
+                       avg_speed = params_dict["AVG_SPEED"],
+                       stop_buffer_time = params_dict["STOP_BUFFER_TIME"])
+end
+
+
+
+# Strings are "d-1", "d-2" etc., "s-1", "s-2" etc and "r-1-1", "r-1-2", ... "r-2-1" etc.
+@with_kw struct MAPFTransitState{LOC}
+    time::Float64       # Planned time to be at the vertex. For routewaypoint, should be before ETA
+    location::LOC       # The actual vertex string ID (TG or OTG); used with get_location_or_routept
+end
+
+Base.isequal(s1::MAPFTransitState, s2::MAPFTransitState) = (s1.time, s1.location) == (s2.time, s2.location)
 
 @enum ActionType Stay=1 Fly=2 Board=3
 
@@ -76,9 +94,14 @@ struct MAPFTransitConstraints
     avoid_vertex_strs::Set{String}
 end
 
-@with_kw struct MAPFTransitVertexState
+@with_kw mutable struct MAPFTransitVertexState{MTS <: MAPFTransitState} <: MAPFState
     idx::Int64
-    state::MAPFTransitState
+    state::MTS
+    vertex_str::String
+end
+
+function reset_time(vs::MAPFTransitVertexState, time::Float64=0.0)
+    vs.state = MAPFTransitState(time, vs.state.location)
 end
 
 function Graphs.vertex_index(g::SimpleVListGraph{MAPFTransitVertexState}, v::MAPFTransitVertexState)
@@ -87,28 +110,36 @@ end
 
 const AgentTask = NamedTuple{(:origin, :site, :dest)}
 
+
 @with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph, TG <: TransitGraph, NN <: NNTree}
     off_transit_graph::OTG
     transit_graph::TG
     state_graph::SimpleVListGraph{MAPFTransitVertexState}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
     agent_tasks::Vector{AgentTask}
     depot_sites_to_vtx::Dict{String,Int64}                          # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
+    trip_to_vtx_range::Vector{Tuple{Int64,Int64}}
     stops_nn_tree::NN                                               # Nearest neighbor tree for stop locations
     nn_idx_to_stop::Vector{Int64}                                   # Maps the ID from NNTree to stop id
     stop_idx_to_trips::Dict{Int64,Set{Int64}}                       # Maps the stop ID to trips passing through them
+    trips_fws_dists::Matrix{Float64}
+    depot_to_sites_dists::Matrix{Float64}
+    drone_params::DroneParams
+    dist_fn::Function
+    curr_goal_idx::Int64                                    = 0
 end
 
 
+function get_vertex_location(env::MAPFTransitEnv, vtx_str::String)
 
-# Split by depot or site (Location) OR route point (RouteWayPoint)
-# function get_location_or_routept(pg::ProblemGraph, vtx_id::String)
-#
-#     splitstr = split(vtx_id, "-")
-#     if splitstr[1] == "d"
-#         return pg.off_transit_graph.depots[parse(Int64, splitstr[2])]
-#     elseif splitstr[1] == "s"
-#         return pg.off_transit_graph.sites[parse(Int64, splitstr[2])]
-#     else
-#         return pg.transit_graph.transit_routes[parse(Int64, splitstr[2])][parse(Int64, splitstr[3])]
-#     end
-# end
+    splitstr = split(vtx_str, "-")
+
+    if splitstr[1] == "d"
+        return env.off_transit_graph.depots[parse(Int64, splitstr[2])]
+    elseif splitstr[1] == "s"
+        return env.off_transit_graph.sites[parse(Int64, splitstr[2])]
+    else
+        rwp = env.transit_graph.transit_trips[parse(Int64, splitstr[2])][parse(Int64, splitstr[3])]
+        return env.stop_to_location[rwp.stop_id]
+    end
+
+end
