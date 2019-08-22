@@ -1,3 +1,5 @@
+## TODO - Make heuristics do min (direct flying, heur value)
+
 ## Implement (E)CBS functions
 function MultiAgentPathFinding.add_constraint!(cbase::MAPFTransitConstraints,
                                                cadd::MAPFTransitConstraints)
