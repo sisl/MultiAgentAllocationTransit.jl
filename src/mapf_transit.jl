@@ -1,5 +1,3 @@
-## TODO - Make heuristics do min (direct flying, heur value)
-
 ## Implement (E)CBS functions
 function MultiAgentPathFinding.add_constraint!(cbase::MAPFTransitConstraints,
                                                cadd::MAPFTransitConstraints)
@@ -226,8 +224,6 @@ function distance_heuristic(env::MAPFTransitEnv, sldist::Float64,
             min_trip_to_trip = (env.trips_fws_dists[trip_id, nn_trip_id] < min_trip_to_trip) ?  env.trips_fws_dists[trip_id, nn_trip_id] : min_trip_to_trip
         end
 
-        # TODO : Remove
-        @assert min_trip_to_trip != Inf
         return (nn_dist + min_trip_to_trip)
     else
 
@@ -249,7 +245,7 @@ function focal_transition_heuristic_transit(env::MAPFTransitEnv, solution::Vecto
 
             # Count conflicts
             for (vtx_state, act) in zip(agt_soln.states[2:end], agt_soln.actions)
-                if vtx_state.state == s2 && act == Board::ActionType && this_act == Board::ActionType
+                if vtx_state.state == s2 && act == MAPFTransitAction(Board) && this_act == MAPFTransitAction(Board)
                     num_conflicts += 1
                 end
             end
@@ -300,14 +296,16 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
     # TODO : Currently dividing max distance by 2
     edge_constraints = [env.drone_params.max_distance]
+    # edge_constraints = [Inf]
 
     # Admissible heuristics
     admissible_heuristic(u) = elapsed_time_heuristic(env, u)
-
+    # admissible_heuristic(u) = 0.0
 
     # Inadmissible heuristics
     focal_state_heuristic(u) = 0.0
     focal_transition_heuristic(u, v) = focal_transition_heuristic_transit(env, solution, agent_idx, u, v)
+    # focal_transition_heuristic(u, v) = 0.0
 
 
     # Constraint heuristic
@@ -323,25 +321,51 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
     # RUN SEARCH
     vis = MAPFTransitGoalVisitor(env, constraints)
-    # @time astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+    @time astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+                                                                           edge_wt_fn,
+                                                                           orig_idx, vis, solver.weight,
+                                                                           admissible_heuristic,
+                                                                           focal_state_heuristic,
+                                                                           focal_transition_heuristic,
+                                                                           edge_constr_functions,
+                                                                           edge_constr_heuristics,
+                                                                           edge_constraints)
+
+    ## A* epsilon
+    # @time a_star_eps_states = a_star_light_epsilon_shortest_path_implicit!(env.state_graph,
+    #                                                            edge_wt_fn, orig_idx,
+    #                                                            vis, solver.weight,
+    #                                                            admissible_heuristic,
+    #                                                            focal_state_heuristic,
+    #                                                            focal_transition_heuristic,
+    #                                                            Float64)
+    # sp_idxs = shortest_path_indices(a_star_eps_states.parent_indices, env.state_graph,
+    #                                 orig_idx, env.curr_goal_idx)
+    # @show sp_idxs
+    # @show [env.state_graph.vertices[s] for s in sp_idxs]
+    # readline()
+
+    ## A* normal
+    # @time a_star_states = a_star_light_shortest_path_implicit!(env.state_graph, edge_wt_fn, orig_idx, vis, admissible_heuristic)
+    # sp_idxs = shortest_path_indices(a_star_states.parent_indices, env.state_graph,
+    #                                 orig_idx, env.curr_goal_idx)
+    # @show sp_idxs
+    # @show [env.state_graph.vertices[s] for s in sp_idxs]
+    # @show a_star_states.dists[env.curr_goal_idx]
+    # readline()
+
+    ## A* - constrained
+    # @time astar_states, tgt_entry = a_star_constrained_shortest_path_implicit!(env.state_graph,
     #                                                                        edge_wt_fn,
-    #                                                                        orig_idx, vis, solver.weight,
-    #                                                                        admissible_heuristic,
-    #                                                                        focal_state_heuristic,
-    #                                                                        focal_transition_heuristic,
+    #                                                                        orig_idx, vis,  admissible_heuristic,
     #                                                                        edge_constr_functions,
     #                                                                        edge_constr_heuristics,
     #                                                                        edge_constraints)
-
-    @time a_star_eps_states = a_star_light_epsilon_shortest_path_implicit!(env.state_graph,
-                                                               edge_wt_fn, orig_idx,
-                                                               vis, solver.weight,
-                                                               admissible_heuristic,
-                                                               focal_state_heuristic,
-                                                               focal_transition_heuristic,
-                                                               Float64)
-
-    readline()
+    # sp_idxs, cost, wts = shortest_path_cost_weights(astar_states, env.state_graph, orig_idx, tgt_entry)
+    # @show sp_idxs
+    # @show [env.state_graph.vertices[s] for s in sp_idxs]
+    # @show cost
+    # readline()
 
     if tgt_entry.v_idx == orig_idx
         @warn "Agent $(agent_idx) Did not find path!"
@@ -373,16 +397,8 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
     goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
 
     if goal_vtx.vertex_str == v.vertex_str
-        # TODO: Check if ok to include time here
-        extra_time = elapsed_time(env, u, v)
-        reset_time(env.state_graph.vertices[env.curr_goal_idx], d + extra_time)
+        reset_time(env.state_graph.vertices[env.curr_goal_idx], d)
         return false
-    end
-
-    # Now generate neighbours
-    # Always consider goal if possible to reach
-    if env.dist_fn(v.state.location, goal_vtx.state.location) < env.drone_params.max_distance
-        push!(nbrs, env.curr_goal_idx)
     end
 
     # Now add other neighbours according to whether depot/site or route vertex
@@ -396,9 +412,9 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
 
         vtx_range = env.trip_to_vtx_range[trip_id]
 
-        next_vtx = vtx_range[1] + parse(Int64, vsplit[3]) + 1
+        next_vtx = vtx_range[1] + parse(Int64, vsplit[3])
 
-        if act == Board::ActionType
+        if act == MAPFTransitAction(Board) && next_vtx <= vtx_range[2]
             # If just boarded, just add the next route vertex
              # say 21-30, seq 4; add vtx 25 (5th in seq)
             push!(nbrs, next_vtx)
@@ -431,12 +447,19 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
             # Ignore the current trip id
             trip_vtx_range = env.trip_to_vtx_range[tid]
 
-            for seq = trip_vtx_range[1]:trip_vtx_range[2]
+            for seq = trip_vtx_range[1]:trip_vtx_range[2]-1
                 if reachable_by_agent(env, v.state, env.state_graph.vertices[seq].state)
                     push!(nbrs, seq)
                 end
             end
         end
+    end
+
+    # Now generate neighbours
+    # Always consider goal if possible to reach
+    if env.dist_fn(v.state.location, goal_vtx.state.location) < env.drone_params.max_distance
+        # @info "Goal added by ", v.idx
+        push!(nbrs, env.curr_goal_idx)
     end
 
     # @show v

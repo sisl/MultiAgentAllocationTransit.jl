@@ -8,7 +8,7 @@ const DEPOT_ORIG = LatLonCoords((lat = 37.762892, lon = -122.472193))
 const SITE = LatLonCoords((lat = 37.789290, lon = -122.426797))
 const DEPOT_DEST = LatLonCoords((lat = 37.751751, lon = -122.410654))
 const MAX_TRANSIT_CAP = 1
-WEIGHT = 1.3
+WEIGHT = 1.05
 
 stop_coords_file = "data/sfmta/stop_to_coords.json"
 trips_file = "data/sfmta/trips.json"
