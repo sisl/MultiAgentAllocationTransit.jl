@@ -37,9 +37,11 @@ export
     OffTransitGraph,
     MAPFTransitEnv,
     MAPFTransitState,
+    MAPFTransitVertexState,
     MAPFTransitAction,
     MAPFTransitConflict,
-    MAPFTransitConstraints
+    MAPFTransitConstraints,
+    AgentTask
 
 # Utils
 export
@@ -66,7 +68,8 @@ export
     trip_meta_graph_fws_dists,
     stop_locations_nearest_neighbors,
     get_stop_idx_to_trip_ids,
-    generate_depot_to_sites_dists
+    generate_depot_to_sites_dists,
+    true_stop_to_locations
 
 # Load Transit Env
 export

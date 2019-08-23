@@ -33,7 +33,7 @@ function load_transit_graph_latlong(stop_coords_file::String, trips_file::String
 
     open(stop_coords_file, "r") do f
 
-        stop_coord_dict = JSON.parse(stop_coords_file)
+        stop_coord_dict = JSON.parse(f)
 
         for (idx_str, latlon) in stop_coord_dict
             idx = parse(Int64, idx_str)
@@ -50,14 +50,14 @@ function load_transit_graph_latlong(stop_coords_file::String, trips_file::String
 
         trips_dict = JSON.parse(f)
 
-        for trip_id in sort(collect(keys(trips_file)))
+        for trip_id in sort(collect(keys(trips_dict)))
 
-            trip = trips_dict[trip_id]
+            trip = trips_dict[string(trip_id)]
             this_trip = Vector{RouteWaypoint}(undef, length(collect(keys(trip))))
 
             for seq = 1:length(collect(keys(trip)))
-                this_trip[seq] = RouteWaypoint(stop_id = trip[seq]["stop_id"],
-                                               arrival_time = trip[seq]["arrival_time"])
+                this_trip[seq] = RouteWaypoint(stop_id = trip[string(seq)]["stop_id"],
+                                               arrival_time = trip[string(seq)]["arrival_time"])
             end
 
             push!(transit_trips, this_trip)
@@ -65,7 +65,7 @@ function load_transit_graph_latlong(stop_coords_file::String, trips_file::String
     end
 
 
-    transit_capacity = [rand(rng, 1:max_transit_capacity) for _ in length(transit_trips)]
+    transit_capacity = [rand(rng, 1:max_transit_capacity) for _ =  1:length(transit_trips)]
 
     return TransitGraph(stop_to_location, transit_trips, transit_capacity)
 
@@ -78,7 +78,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
     depot_sites_to_vtx = Dict{String,Int64}()
 
     # First add depots and sites
-    for (d, depot_loc) in enumerate(transit_graph.depots)
+    for (d, depot_loc) in enumerate(off_transit_graph.depots)
         idx = num_vertices(state_graph) + 1
         vertex_str = string("d-", d)
         new_vtx = MAPFTransitVertexState(idx = idx, state = MAPFTransitState(time = 0.0, location = depot_loc),
@@ -87,7 +87,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
         depot_sites_to_vtx[vertex_str] = idx
     end
 
-    for (s, site_loc) in enumerate(transit_graph.sites)
+    for (s, site_loc) in enumerate(off_transit_graph.sites)
         idx = num_vertices(state_graph) + 1
         vertex_str = string("s-", s)
         new_vtx = MAPFTransitVertexState(idx = idx, state = MAPFTransitState(time = 0.0, location = site_loc),
@@ -97,9 +97,9 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
     end
 
     # Now iterate over trips
-    trip_to_vtx_range = Vector{Int64,Tuple{Int64,Int64}}(undef, length(tg.transit_trips))
+    trip_to_vtx_range = Vector{Tuple{Int64,Int64}}(undef, length(transit_graph.transit_trips))
 
-    for (trip_id, trip) in enumerate(tg.transit_trips)
+    for (trip_id, trip) in enumerate(transit_graph.transit_trips)
 
         range_st = num_vertices(state_graph) + 1
         range_end = range_st
@@ -108,7 +108,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
         for (seq, rwp) in enumerate(trip)
 
             idx = range_end
-            state = MAPFTransitState(time = rwp.arrival_time, location = tg.stop_to_location[rwp.stop_id])
+            state = MAPFTransitState(time = rwp.arrival_time, location = transit_graph.stop_to_location[rwp.stop_id])
             vertex_str = string("r-", trip_id, "-", seq)
 
             new_vtx = MAPFTransitVertexState(idx = idx, state = state, vertex_str = vertex_str)
@@ -117,7 +117,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
 
         end
 
-        trip_to_vtx_range[trip_id] = (range_st, range_end)
+        trip_to_vtx_range[trip_id] = (range_st, range_end-1)
     end
 
     return state_graph, depot_sites_to_vtx, trip_to_vtx_range

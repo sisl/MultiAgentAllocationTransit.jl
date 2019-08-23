@@ -45,11 +45,11 @@ function MultiAgentPathFinding.set_low_level_context!(::MAPFTransitEnv, ::Int64,
     # Not sure what to do here
 end
 
-MultiAgentPathFinding.get_empty_constraint(::Type{MAPFTransitConstraints}) = Set{String}()
+MultiAgentPathFinding.get_empty_constraint(::Type{MAPFTransitConstraints}) = MAPFTransitConstraints(Set{String}())
 
 
 function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
-                                                  solution::Vector{PlanResult})
+                                                  solution::Vector{PR}) where {PR <: PlanResult}
 
     # First look for boarding/alighting constraints
     # But simultaneously note transit capacity usage
@@ -58,8 +58,8 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
 
 
             # Now we have the two solutions
-            for (state_i, act_i) in zip(sol_i.states[2:end], sol_i.actions)
-                for (state_j, act_j) in zip(sol_j.states[2:end], sol_j.actions)
+            for ((state_i, _), (act_i, _)) in zip(sol_i.states[2:end], sol_i.actions)
+                for ((state_j, _), (act_j, _)) in zip(sol_j.states[2:end], sol_j.actions)
 
                     # Conflict - boarding vertex at same time
                     # TODO : Prevent leaving at same time? One leaving, one boarding?
@@ -77,7 +77,7 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
     # Now look for capacity constraints ONLY
     transit_vtx_agents = Dict()
     for (i, sol_i) in enumerate(solution)
-        for state_i in sol_i.states
+        for (state_i, _) in sol_i.states
 
             isplit = split(state_i.vertex_str, "-")
 
@@ -102,7 +102,7 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
     # TODO: Find a way to use all conflicts??? For now, returning first
     for (rid, wpid_agents) in transit_vtx_agents
 
-        route_cap = transit_capacity[rid]
+        route_cap = env.transit_graph.transit_capacity[rid]
         wpid_list = sort(collect(keys(wpid_agents)))
 
         for i = 1:length(wpid_list)-1
@@ -178,14 +178,14 @@ end
 function elapsed_time(env::MAPFTransitEnv,
                       s1::MAPFTransitVertexState, s2::MAPFTransitVertexState)
 
-    if s2.time == 0.0
+    if s2.state.time == 0.0
 
         # Compute distance between s1 and s2 and divide by avg speed
         dist = env.dist_fn(s1.state.location, s2.state.location)
         return dist/env.drone_params.avg_speed
 
     else
-        return (s2.time - s1.time)
+        return (s2.state.time - s1.state.time)
     end
 end
 
@@ -230,14 +230,15 @@ function distance_heuristic(env::MAPFTransitEnv, sldist::Float64,
         @assert min_trip_to_trip != Inf
         return (nn_dist + min_trip_to_trip)
     else
+
         return sldist
     end
 end
 
 
 # Focal state heuristic - min boarding conflicts
-function focal_transition_heuristic_transit(env::MAPFTransitEnv, solution::Vector{PlanResult},
-                                            agent_idx::Int64, u::MAPFTransitVertexState, v::MAPFTransitVertexState)
+function focal_transition_heuristic_transit(env::MAPFTransitEnv, solution::Vector{PR},
+                                            agent_idx::Int64, u::MAPFTransitVertexState, v::MAPFTransitVertexState) where {PR <: PlanResult}
 
     num_conflicts = 0
 
@@ -258,6 +259,9 @@ function focal_transition_heuristic_transit(env::MAPFTransitEnv, solution::Vecto
     return num_conflicts
 end
 
+function MultiAgentPathFinding.focal_heuristic(env::MAPFTransitEnv, solution::Vector{PR}) where {PR <: PlanResult}
+    return 0
+end
 
 function reachable_by_agent(env::MAPFTransitEnv, s1::MAPFTransitState, s2::MAPFTransitState)
     # Check that dist is less than avg_speed x time
@@ -268,8 +272,8 @@ end
 # Runs low level search from depot to site, and then to depot
 # Info for each agent available as agent_tasks
 function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::Int64,
-                                                 s::MAPFTransitState, constraints::MAPFTransitConstraints,
-                                                 solution::Vector{PlanResult})
+                                                 s::MAPFTransitVertexState, constraints::MAPFTransitConstraints,
+                                                 solution::Vector{PR}) where {PR <: PlanResult}
 
     env = solver.env
 
@@ -284,18 +288,22 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     env.curr_goal_idx = env.depot_sites_to_vtx[goal_str]
     reset_time(env.state_graph.vertices[env.curr_goal_idx])
 
+
     # Need the following
     # Edge weight function - Just the elapsed time difference
-    edge_wt_fn(u, v) = elapsed_time(env, env.state_graph.vertices[u], env.state_graph.vertices[v])
+    edge_wt_fn(u, v) = elapsed_time(env, u, v)
 
     # Edge constraint function
-    edge_constr_fn(u, v) = distance_traversed(env, env.state_graph.vertices[u], env.state_graph.vertices[v])
+    edge_constr_fn(u, v) = distance_traversed(env, u, v)
+
     edge_constr_functions = [edge_constr_fn]
 
+    # TODO : Currently dividing max distance by 2
     edge_constraints = [env.drone_params.max_distance]
 
     # Admissible heuristics
-    admissible_heuristic(u) = elapsed_time_heuristic(env, env.state_graph.vertices[u])
+    admissible_heuristic(u) = elapsed_time_heuristic(env, u)
+
 
     # Inadmissible heuristics
     focal_state_heuristic(u) = 0.0
@@ -306,21 +314,34 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     sldist_heur = env.depot_to_sites_dists[agt_task.origin, agt_task.site]
     goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
     goal_vtx_loc_vect = convert_to_vector(goal_vtx.state.location)
-    nn_idx, nn_dist = knn(env.stops_nn_tree, goal_vtx_loc_vect, 1)
+    nn_idxs, nn_dists = knn(env.stops_nn_tree, goal_vtx_loc_vect, 1)
+    nn_idx = nn_idxs[1]
+    nn_dist = nn_dists[1]
     nn_stop = env.nn_idx_to_stop[nn_idx]
-    dist_heur(u) = distance_heuristic(env, sldist_heur, nn_stop, nn_dist, env.state_graph.vertices[u])
+    dist_heur(u) = distance_heuristic(env, sldist_heur, nn_stop, nn_dist, u)
     edge_constr_heuristics = [dist_heur]
 
     # RUN SEARCH
-    states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
-                                                                           edge_wt_fn,
-                                                                           orig_idx, vis, solver.weight,
-                                                                           admissible_heuristic,
-                                                                           focal_state_heuristic,
-                                                                           focal_transition_heuristic,
-                                                                           edge_constr_functions,
-                                                                           edge_constr_heuristics,
-                                                                           edge_constraints)
+    vis = MAPFTransitGoalVisitor(env, constraints)
+    # @time astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+    #                                                                        edge_wt_fn,
+    #                                                                        orig_idx, vis, solver.weight,
+    #                                                                        admissible_heuristic,
+    #                                                                        focal_state_heuristic,
+    #                                                                        focal_transition_heuristic,
+    #                                                                        edge_constr_functions,
+    #                                                                        edge_constr_heuristics,
+    #                                                                        edge_constraints)
+
+    @time a_star_eps_states = a_star_light_epsilon_shortest_path_implicit!(env.state_graph,
+                                                               edge_wt_fn, orig_idx,
+                                                               vis, solver.weight,
+                                                               admissible_heuristic,
+                                                               focal_state_heuristic,
+                                                               focal_transition_heuristic,
+                                                               Float64)
+
+    readline()
 
     if tgt_entry.v_idx == orig_idx
         @warn "Agent $(agent_idx) Did not find path!"
@@ -328,14 +349,14 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     end
 
     # Get sp idxs, costs and weights
-    sp_idxs, cost, wts = shortest_path_cost_weights(states, env.state_graph, orig_idx, tgt_entry)
+    sp_idxs, cost, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
     # Generate plan result
     states = [(get_mapf_state_from_idx(env, idx), 0.0) for idx in sp_idxs]
-    actions = [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp[2:end])]
-    fmin = states.best_fvalue
+    actions = [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])]
+    fmin = astar_eps_states.best_fvalue
 
-    return PlanResult(states, actions, cost, fmin)
+    return PlanResult{MAPFTransitVertexState, MAPFTransitAction, Float64}(states, actions, cost, fmin)
 end
 
 
@@ -365,7 +386,7 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
     end
 
     # Now add other neighbours according to whether depot/site or route vertex
-    vsplit = split(v, "-")
+    vsplit = split(v.vertex_str, "-")
 
     if vsplit[1] == "r"
 
@@ -418,7 +439,10 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
         end
     end
 
+    # @show v
     # @show nbrs
+    #
+    # readline()
 
     return true
 end

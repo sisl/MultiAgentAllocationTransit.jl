@@ -91,9 +91,36 @@ function get_stop_idx_to_trip_ids(tg::TG) where {TG <: TransitGraph}
     return stop_idx_to_trips
 end
 
+
+
+function true_stop_to_locations(stop_to_location::Dict{Int64,LOC}, stop_idx_to_trips::Dict) where {LOC}
+
+    keys_to_keep = Set{Int64}()
+
+    true_stop_to_locs = Dict{Int64,LOC}()
+
+    for stlkey in collect(keys(stop_to_location))
+
+        if haskey(stop_idx_to_trips, stlkey)
+            push!(keys_to_keep, stlkey)
+        end
+    end
+
+    # Now copy over
+    for kk in keys_to_keep
+        true_stop_to_locs[kk] = stop_to_location[kk]
+    end
+
+    return true_stop_to_locs
+
+end
+
+
+# Compute the minimum pairwise distance between depots and sites either through direct flight
+# OR by using the Time Invariant Route Graph
 function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, stops_nn_tree::NNTree,
                                        nn_idx_to_stop::Vector{Int64}, stop_idx_to_trips::Dict{Int64,Set{Int64}},
-                                       trips_fws_dists::Matrix{Float64})
+                                       trips_fws_dists::Matrix{Float64}, dist_fn::Function)
 
     depot_to_sites_dists = zeros(length(otg.depots), length(otg.sites))
 
@@ -101,11 +128,15 @@ function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, s
         for (s, site_loc) in enumerate(otg.sites)
 
             depot_vect = convert_to_vector(depot_loc)
-            d_nn_idx, d_nn_dist = knn(stops_nn_tree, depot_vect, 1)
+            d_nn_idxs, d_nn_dists = knn(stops_nn_tree, depot_vect, 1)
+            d_nn_idx = d_nn_idxs[1]
+            d_nn_dist = d_nn_dists[1]
             d_nn_stop = nn_idx_to_stop[d_nn_idx]
 
             site_vect = convert_to_vector(site_loc)
-            s_nn_idx, s_nn_dist = knn(stops_nn_tree, site_vect, 1)
+            s_nn_idxs, s_nn_dists = knn(stops_nn_tree, site_vect, 1)
+            s_nn_idx = s_nn_idxs[1]
+            s_nn_dist = s_nn_dists[1]
             s_nn_stop = nn_idx_to_stop[s_nn_idx]
 
             min_trip_to_trip = Inf
@@ -115,8 +146,9 @@ function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, s
                 end
             end
 
-            depot_to_sites_dists[d, s] = d_nn_dist + s_nn_dist + min_trip_to_trip
-            depot_to_sites_dists[s, d] = depot_to_sites_dists[d, s]
+            # Either direct flight OR through trips
+            mindist = min(dist_fn(depot_loc, site_loc), d_nn_dist + s_nn_dist + min_trip_to_trip)
+            depot_to_sites_dists[d, s] = mindist
         end
     end
 

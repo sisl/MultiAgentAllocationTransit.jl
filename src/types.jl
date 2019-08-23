@@ -1,5 +1,6 @@
 const Location2D = SVector{2, Float64}
-const LatLonCoords = NamedTuple{(:lat, :lon)}
+const LatLonCoords = NamedTuple{(:lat, :lon), Tuple{Float64,Float64}}
+LatLonCoords() = (lat = 0.0, lon = 0.0)
 
 function convert_to_vector(c::LatLonCoords)
     return Location2D(c.lat, c.lon)
@@ -65,7 +66,7 @@ end
 # Strings are "d-1", "d-2" etc., "s-1", "s-2" etc and "r-1-1", "r-1-2", ... "r-2-1" etc.
 @with_kw struct MAPFTransitState{LOC}
     time::Float64       # Planned time to be at the vertex. For routewaypoint, should be before ETA
-    location::LOC       # The actual vertex string ID (TG or OTG); used with get_location_or_routept
+    location::LOC              # The actual vertex string ID (TG or OTG); used with get_location_or_routept
 end
 
 Base.isequal(s1::MAPFTransitState, s2::MAPFTransitState) = (s1.time, s1.location) == (s2.time, s2.location)
@@ -90,7 +91,7 @@ end
 end
 
 # Vertex Constraints are basically MAPFTransitState instances for depot/sites
-struct MAPFTransitConstraints
+struct MAPFTransitConstraints <: MAPFConstraints
     avoid_vertex_strs::Set{String}
 end
 
@@ -111,10 +112,11 @@ end
 const AgentTask = NamedTuple{(:origin, :site, :dest)}
 
 
-@with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph, TG <: TransitGraph, NN <: NNTree}
+@with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph,
+                                       TG <: TransitGraph, NN <: NNTree, MVTS <: MAPFTransitVertexState} <: MAPFEnvironment
     off_transit_graph::OTG
     transit_graph::TG
-    state_graph::SimpleVListGraph{MAPFTransitVertexState}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
+    state_graph::SimpleVListGraph{MVTS}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
     agent_tasks::Vector{AgentTask}
     depot_sites_to_vtx::Dict{String,Int64}                          # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
     trip_to_vtx_range::Vector{Tuple{Int64,Int64}}

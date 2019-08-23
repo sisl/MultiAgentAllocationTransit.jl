@@ -95,7 +95,7 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[Graphs]]
 deps = ["DataStructures", "Parameters", "SparseArrays"]
-git-tree-sha1 = "de862324b09117ea0502c0246108d6e28b6f8433"
+git-tree-sha1 = "e5a0f3a5e6926392887d4f689c86e180434c7a9c"
 repo-rev = "master"
 repo-url = "/home/shushman/.julia/dev/Graphs"
 uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
@@ -155,7 +155,7 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[MultiAgentPathFinding]]
 deps = ["DataStructures", "Graphs", "JSON", "Parameters", "Random", "YAML"]
-git-tree-sha1 = "dcda91de1a941fdd68dc41e53311fc0375a4d406"
+git-tree-sha1 = "3af5d630ab96e2514e62a403ba80a70e62c2f86e"
 repo-rev = "master"
 repo-url = "/home/shushman/.julia/dev/MultiAgentPathFinding"
 uuid = "42a2a06c-b1c1-11e9-17d7-43429d2d2199"

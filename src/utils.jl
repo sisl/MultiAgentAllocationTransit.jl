@@ -67,10 +67,10 @@ function load_depots(depot_file::String)
 end
 
 
-function load_stop_to_location(::Type{LatLonCoords}, stop_coord_file::String)
+function load_stop_to_location(::Type{LatLonCoords}, stop_coords_file::String)
 
     stop_coord_dict = Dict()
-    open(stop_coord_file, "r") do f
+    open(stop_coords_file, "r") do f
         stop_coord_dict = JSON.parse(f)
     end
 
