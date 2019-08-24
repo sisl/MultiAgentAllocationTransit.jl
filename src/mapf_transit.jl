@@ -300,12 +300,10 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
     # Admissible heuristics
     admissible_heuristic(u) = elapsed_time_heuristic(env, u)
-    # admissible_heuristic(u) = 0.0
 
     # Inadmissible heuristics
     focal_state_heuristic(u) = 0.0
     focal_transition_heuristic(u, v) = focal_transition_heuristic_transit(env, solution, agent_idx, u, v)
-    # focal_transition_heuristic(u, v) = 0.0
 
 
     # Constraint heuristic
@@ -321,6 +319,9 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
     # RUN SEARCH
     vis = MAPFTransitGoalVisitor(env, constraints)
+
+
+
     @time astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
                                                                            edge_wt_fn,
                                                                            orig_idx, vis, solver.weight,
@@ -394,6 +395,7 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
                                 d::Float64, nbrs::Vector{Int64})
 
     env = vis.env
+    constraints = vis.constraints
     goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
 
     if goal_vtx.vertex_str == v.vertex_str
@@ -414,28 +416,41 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
 
         next_vtx = vtx_range[1] + parse(Int64, vsplit[3])
 
-        if act == MAPFTransitAction(Board) && next_vtx <= vtx_range[2]
+        if act == MAPFTransitAction(Board) && next_vtx <= vtx_range[2] &&
+            ~(env.state_graph.vertices[next_vtx].vertex_str in constraints.avoid_vertex_strs)
             # If just boarded, just add the next route vertex
              # say 21-30, seq 4; add vtx 25 (5th in seq)
             push!(nbrs, next_vtx)
             return true
         else
             # Has been on trip - can either continue to next (if any left) and/or must get off
-            if next_vtx <= vtx_range[2]
+            if next_vtx <= vtx_range[2] &&
+                ~(env.state_graph.vertices[next_vtx].vertex_str in constraints.avoid_vertex_strs)
                 push!(nbrs, next_vtx)
             end
 
             # Cycle through other trips and add those that can be reached in time
+            # TODO : Don't just add min distance - may be a LONG wait
             for (tid, trip) in enumerate(env.transit_graph.transit_trips)
 
                 # Ignore the current trip id
                 if tid != trip_id
                     trip_vtx_range = env.trip_to_vtx_range[tid]
 
+                    minseq = 0
+                    mindist = Inf
+
                     for seq = trip_vtx_range[1]:trip_vtx_range[2]
-                        if reachable_by_agent(env, v.state, env.state_graph.vertices[seq].state)
-                            push!(nbrs, seq)
+                        if ~(env.state_graph.vertices[seq].vertex_str in constraints.avoid_vertex_strs)
+                            dist = env.dist_fn(v.state.location, env.state_graph.vertices[seq].state.location)
+                            if dist < mindist && reachable_by_agent(env, v.state, env.state_graph.vertices[seq].state)
+                                mindist = dist
+                                minseq = seq
+                            end
                         end
+                    end
+                    if minseq != 0
+                        push!(nbrs, minseq)
                     end
                 end
             end
@@ -447,10 +462,20 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
             # Ignore the current trip id
             trip_vtx_range = env.trip_to_vtx_range[tid]
 
+            minseq = 0
+            mindist = Inf
+
             for seq = trip_vtx_range[1]:trip_vtx_range[2]-1
-                if reachable_by_agent(env, v.state, env.state_graph.vertices[seq].state)
-                    push!(nbrs, seq)
+                if ~(env.state_graph.vertices[seq].vertex_str in constraints.avoid_vertex_strs)
+                    dist = env.dist_fn(v.state.location, env.state_graph.vertices[seq].state.location)
+                    if dist < mindist && reachable_by_agent(env, v.state, env.state_graph.vertices[seq].state)
+                        mindist = dist
+                        minseq = seq
+                    end
                 end
+            end
+            if minseq != 0
+                push!(nbrs, minseq)
             end
         end
     end

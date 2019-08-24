@@ -46,6 +46,35 @@ function generate_sites(coords_bb_lo::LatLonCoords, coords_bb_hi::LatLonCoords,
 
 end # function
 
+function get_non_dominated_trip_points(env::MAPFTransitEnv, vtx::MAPFTransitVertexState, tid::Int64)
+
+    trip_vtx_range = env.trip_to_vtx_range[tid]
+
+    time_dist_set = Vector{Tuple{Int64,Float64,Float64}}(undef, 0)
+
+    # First run through and put in list if reachable by agent
+    for seq = trip_vtx_range[1]:trip_vtx_range[2]
+        dist = env.dist_fn(vtx.state.location, env.state_graph.vertices[seq].state.location)
+        tdiff = env.state_graph.vertices[seq].state.time - vtx.state.time
+
+        if env.drone_params.avg_speed * tdiff > dist
+            push!(time_dist_set, (seq, tdiff, dist))
+        end
+    end
+
+    # YOU KNOW THIS IS ALREADY SORTED IN INCREASING ETA AND REACHABLE
+    non_dom_idxs = Set{Int64}(1)
+    time_dist_copy = deepcopy(time_dist_set)
+
+    # Start from second element
+    for (i, elem) in enumerate(time_dist_set[2:end])
+        for ndi in non_dom_idxs
+            if (time_dist_set[ndi][2], time_dist_set[ndi][3]) <= (time_dist_set[i][2], time_dist_set[i][3]) 
+
+
+
+end # function
+
 # Reads in a depot file and returns a vector of depot locations
 function load_depots(depot_file::String)
 

@@ -155,3 +155,8 @@ function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, s
     return depot_to_sites_dists
 
 end
+
+
+# TODO : Snapshot preprocessing
+# For each depot/site-trip pair, find the set of non-dominated (by time/weight) reachable transit points
+# IMP - this won't work when leaving a site since that time is unknown!!
