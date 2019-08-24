@@ -69,7 +69,8 @@ function get_non_dominated_trip_points(env::MAPFTransitEnv, vtx::MAPFTransitVert
     # Start from second element
     for (i, elem) in enumerate(time_dist_set[2:end])
         for ndi in non_dom_idxs
-            if (time_dist_set[ndi][2], time_dist_set[ndi][3]) <= (time_dist_set[i][2], time_dist_set[i][3]) 
+            if (time_dist_set[ndi][2], time_dist_set[ndi][3]) <= (time_dist_set[i][2], time_dist_set[i][3])
+
 
 
 
