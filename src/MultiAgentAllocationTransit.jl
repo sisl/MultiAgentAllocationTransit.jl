@@ -1,5 +1,7 @@
 module MultiAgentAllocationTransit
 
+import Base: isempty
+
 # Base
 using Random
 using LinearAlgebra
@@ -55,7 +57,8 @@ export
     EuclideanLatLong,
     stop_locations_nearest_neighbors,
     trip_meta_graph_fws_dists,
-    get_stop_idx_to_trip_ids
+    get_stop_idx_to_trip_ids,
+    get_non_dominated_trip_points
 
 # GTFS Parser
 export

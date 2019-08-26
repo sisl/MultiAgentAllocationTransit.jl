@@ -85,15 +85,23 @@ end
 
 @with_kw struct MAPFTransitConflict <: MAPFConflict
     type::ConflictType
-    overlap_vertices::Set{String}
-    overlap_agents::Set{Int64}  # Maps agent ID to overlapping subroutes
+    overlap_vertices::Set{Int64}
+    # overlap_agents::Set{Int64}  # Maps agent ID to overlapping subroutes
+    agent_to_state_idx::Dict{Int64,Int64} # Maps overlapping agent ID to index along state vect
     cap::Int64                      = 1
 end
 
+@enum ConstraintSubPath towards=1 from=2
+
 # Vertex Constraints are basically MAPFTransitState instances for depot/sites
 struct MAPFTransitConstraints <: MAPFConstraints
-    avoid_vertex_strs::Set{String}
+    avoid_vertex_map::Dict{ConstraintSubPath,Set{Int64}}
 end
+
+MAPFTransitConstraints() = MAPFTransitConstraints(Dict{ConstraintSubPath,Set{Int64}}(towards => Set{Int64}(),
+                                                                                     from => Set{Int64}()))
+
+Base.isempty(mtc::MAPFTransitConstraints) = isempty(mtc.avoid_vertex_map[towards]) && isempty(mtc.avoid_vertex_map[from])
 
 @with_kw mutable struct MAPFTransitVertexState{MTS <: MAPFTransitState} <: MAPFState
     idx::Int64
@@ -127,7 +135,9 @@ const AgentTask = NamedTuple{(:origin, :site, :dest)}
     depot_to_sites_dists::Matrix{Float64}
     drone_params::DroneParams
     dist_fn::Function
+    curr_site_points::Vector{Int64}
     curr_goal_idx::Int64                                    = 0
+    num_global_conflicts::Int64                             = 0
 end
 
 

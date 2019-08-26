@@ -46,7 +46,8 @@ function generate_sites(coords_bb_lo::LatLonCoords, coords_bb_hi::LatLonCoords,
 
 end # function
 
-function get_non_dominated_trip_points(env::MAPFTransitEnv, vtx::MAPFTransitVertexState, tid::Int64)
+function get_non_dominated_trip_points(env::MAPFTransitEnv, avoid_vertex_idxs::Set{Int64},
+                                       vtx::MAPFTransitVertexState, tid::Int64)
 
     trip_vtx_range = env.trip_to_vtx_range[tid]
 
@@ -57,21 +58,36 @@ function get_non_dominated_trip_points(env::MAPFTransitEnv, vtx::MAPFTransitVert
         dist = env.dist_fn(vtx.state.location, env.state_graph.vertices[seq].state.location)
         tdiff = env.state_graph.vertices[seq].state.time - vtx.state.time
 
-        if env.drone_params.avg_speed * tdiff > dist
+        if dist < env.drone_params.max_distance && env.drone_params.avg_speed * tdiff > dist &&
+            ~(seq in avoid_vertex_idxs)
             push!(time_dist_set, (seq, tdiff, dist))
         end
     end
 
+    if isempty(time_dist_set)
+        return []
+    end
     # YOU KNOW THIS IS ALREADY SORTED IN INCREASING ETA AND REACHABLE
     non_dom_idxs = Set{Int64}(1)
-    time_dist_copy = deepcopy(time_dist_set)
 
     # Start from second element
     for (i, elem) in enumerate(time_dist_set[2:end])
+        dom = false
         for ndi in non_dom_idxs
-            if (time_dist_set[ndi][2], time_dist_set[ndi][3]) <= (time_dist_set[i][2], time_dist_set[i][3])
+            # If dist is worse, then dominated
+            if elem[3] >= time_dist_set[ndi][3]
+                dom = true
+                break
+            end
+        end
 
+        if dom == false
+            push!(non_dom_idxs, i)
+        end
+    end
 
+    # Now return all seq points from ndi
+    seqs = [time_dist_set[ndi][1] for ndi in non_dom_idxs]
 
 
 end # function
