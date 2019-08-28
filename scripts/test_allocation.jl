@@ -20,3 +20,16 @@ depot_sites = vcat(depots, sites)
 n_depots = 3
 n_sites = 5
 cost_fn(i, j) = distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
+
+
+# Run the task allocation
+edges, x_edges, vds, dsv, cv = min_connecting_tour(n_depots, n_sites, cost_fn)
+
+# Get connected depots
+depot_comps = get_connected_depots(n_depots, n_sites, edges)
+
+# Merge the depots and add edges
+add_merged_depot_edges!(x_edges, depot_comps, dsv, n_depots, n_sites, cv)
+
+# Get Eulerian circuit
+circuit = get_multiedge_eulerian_tour(x_edges, vds, n_depots, n_sites, cost_fn)
