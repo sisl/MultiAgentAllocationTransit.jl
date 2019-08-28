@@ -137,7 +137,6 @@ const AgentTask = NamedTuple{(:origin, :site, :dest)}
     dist_fn::Function
     curr_site_points::Vector{Int64}
     curr_goal_idx::Int64                                    = 0
-    num_global_conflicts::Int64                             = 0
 end
 
 

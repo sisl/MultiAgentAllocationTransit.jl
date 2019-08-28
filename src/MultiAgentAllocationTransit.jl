@@ -19,6 +19,9 @@ using DataFrames
 using Distances
 using NearestNeighbors
 using IterTools
+using GLPK
+using JuMP
+using LightGraphs
 
 # Custom
 using TOML
@@ -74,6 +77,13 @@ export
     generate_depot_to_sites_dists,
     true_stop_to_locations
 
+# Task Allocation
+export
+    min_connecting_tour,
+    get_connected_depots,
+    add_merged_depot_edges!,
+    get_multiedge_eulerian_tour
+
 # Load Transit Env
 export
     load_depot_site_locations_latlong,
@@ -86,6 +96,7 @@ include("types.jl")
 include("utils.jl")
 include("gtfs_parser.jl")
 include("preprocessing.jl")
+include("task_allocation.jl")
 include("mapf_transit.jl")
 include("load_transit_env.jl")
 

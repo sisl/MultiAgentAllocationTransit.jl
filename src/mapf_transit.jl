@@ -65,7 +65,6 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
                     if state_i.state == state_j.state && act_i == Board::ActionType && act_j == Board::ActionType
                         return MAPFTransitConflict(type = Transfer::ConflictType,
                                                    overlap_vertices = Set{String}(state_i.idx),
-                                                   # overlap_agents = Set{Int64}([i, j]),
                                                    agent_to_state_idx = Dict(i => si+1, j => sj+1)) # +1 because enumerating from 2
                     end
                 end
@@ -140,7 +139,6 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
                 # readline()
                 return MAPFTransitConflict(type = Capacity::ConflictType,
                                            overlap_vertices = overlap_verts,
-                                           # overlap_agents = agents,
                                            agent_to_state_idx = agent_dict,
                                            cap = route_cap)
             end
@@ -155,7 +153,6 @@ end
 
 function MultiAgentPathFinding.create_constraints_from_conflict(env::MAPFTransitEnv, conflict::MAPFTransitConflict)
 
-    env.num_global_conflicts += 1
     # Do for each type of conflict
     if conflict.type ==  Transfer::ConflictType
 
@@ -299,8 +296,32 @@ function focal_transition_heuristic_transit(env::MAPFTransitEnv, solution::Vecto
     return num_conflicts
 end
 
+# Just count the boarding conflicts, if any?
 function MultiAgentPathFinding.focal_heuristic(env::MAPFTransitEnv, solution::Vector{PR}) where {PR <: PlanResult}
-    return 0
+
+    num_conflicts = 0
+
+    # First look for boarding/alighting constraints
+    # But simultaneously note transit capacity usage
+    for (i, sol_i) in enumerate(solution[1:end-1])
+        for (j, sol_j) in enumerate(solution[i+1:end])
+
+
+            # Now we have the two solutions
+            for (si, ((state_i, _), (act_i, _))) in enumerate(zip(sol_i.states[2:end], sol_i.actions))
+                for (sj, ((state_j, _), (act_j, _))) in enumerate(zip(sol_j.states[2:end], sol_j.actions))
+
+                    # Conflict - boarding vertex at same time
+                    # TODO : Prevent leaving at same time? One leaving, one boarding?
+                    if state_i.state == state_j.state && act_i == Board::ActionType && act_j == Board::ActionType
+                        num_conflicts += 1
+                    end
+                end
+            end
+        end
+    end
+
+    return num_conflicts
 end
 
 function reachable_by_agent(env::MAPFTransitEnv, s1::MAPFTransitState, s2::MAPFTransitState)
@@ -310,6 +331,7 @@ end
 
 
 # Runs low level search from depot to site, and then to depot
+# FURTHER tasks can be run as separate chunks
 # Info for each agent available as agent_tasks
 function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::Int64,
                                                  s::MAPFTransitVertexState, constraints::MAPFTransitConstraints,
@@ -440,7 +462,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
         # Iterate until env.curr_site_points[agt]
         # @assert env.curr_site_points[agent_idx] > 0
 
-        @info "Copying over subpart towards of agent $(agent_idx)"
+        @debug "Copying over subpart towards of agent $(agent_idx)"
 
         states = solution[agent_idx].states[1 : env.curr_site_points[agent_idx]]
         actions = solution[agent_idx].actions[1 : env.curr_site_points[agent_idx]]
@@ -493,7 +515,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
         # Extract solution stuff
         sp_idxs, cost_2, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
-        append!(states, [(get_mapf_state_from_idx(env, idx), 0.0) for idx in sp_idxs[2:end]]) # First element is same as last of prev
+        append!(states, [(get_mapf_state_from_idx(env, idx), cost_2) for idx in sp_idxs[2:end]]) # First element is same as last of prev
         append!(actions, [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])])
         cost += cost_2
         fmin += cost_2
@@ -501,7 +523,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
         # @assert env.curr_site_points[agent_idx] > 0
 
-        @info "Copying over subpart from of agent $(agent_idx)"
+        @debug "Copying over subpart from of agent $(agent_idx)"
 
         append!(states, solution[agent_idx].states[env.curr_site_points[agent_idx] + 1 : end])
         append!(actions, solution[agent_idx].actions[env.curr_site_points[agent_idx] : end])

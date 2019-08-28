@@ -118,6 +118,7 @@ end
 
 # Compute the minimum pairwise distance between depots and sites either through direct flight
 # OR by using the Time Invariant Route Graph
+# This is SYMMETRIC on the time-invariant route graph
 function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, stops_nn_tree::NNTree,
                                        nn_idx_to_stop::Vector{Int64}, stop_idx_to_trips::Dict{Int64,Set{Int64}},
                                        trips_fws_dists::Matrix{Float64}, dist_fn::Function)
@@ -155,8 +156,3 @@ function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, s
     return depot_to_sites_dists
 
 end
-
-
-# TODO : Snapshot preprocessing
-# For each depot/site-trip pair, find the set of non-dominated (by time/weight) reachable transit points
-# IMP - this won't work when leaving a site since that time is unknown!!

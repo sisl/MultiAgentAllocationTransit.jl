@@ -8,11 +8,11 @@ const DEPOT2 = LatLonCoords((lat = 37.751751, lon = -122.410654))
 const DEPOT3 = LatLonCoords((lat = 37.718779, lon = -122.462401))
 
 const SITE1 = LatLonCoords((lat = 37.789290, lon = -122.426797)) # Top right
-const SITE1DUMMY = LatLonCoords((lat = 37.788042, lon = -122.429579))
 const SITE2 = LatLonCoords((lat = 37.739611, lon = -122.492203)) # Way left
 const SITE3 = LatLonCoords((lat = 37.780593, lon = -122.434555)) # Under SITE 1
 const SITE4 = LatLonCoords((lat = 37.739011, lon = -122.430059)) # Near the bottom
 const SITE5 = LatLonCoords((lat = 37.749018, lon = -122.462966)) # 2nd most left
+const SITE1DUMMY = LatLonCoords((lat = 37.788042, lon = -122.429579))
 
 const MAX_TRANSIT_CAP = 1
 WEIGHT = 1.05
