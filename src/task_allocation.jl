@@ -297,5 +297,81 @@ function get_multiedge_eulerian_tour(x_edges::Vector{Int64}, vector_idx_to_depot
     return circuit
 end
 
+# Remove leading and trailing depots except the one just before the
+# first package and the one just after the last package
+function trim_circuit!(circuit::Vector, n_depots::Int64)
 
-# tour_cost = sum(cv[dsv[(i,j)]] for (i,j) in zip(circuit[1:end-1],circuit[2:end]))
+    # Trim leading depots
+    first_site_idx = findfirst(x -> x > n_depots, circuit)
+    for i = 1:first_site_idx-2
+        popfirst!(circuit)
+    end
+
+    last_site_idx = findlast(x -> x > n_depots, circuit)
+    for i = last_site_idx+2:length(circuit)
+        pop!(circuit)
+    end
+
+end
+
+function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cost_fn::Function)
+
+    arc_costs = [cost_fn(i, j) for (i, j) in zip(circuit[1:end-1], circuit[2:end])]
+    total_cost = sum(arc_costs)
+
+    agent_tours = Vector{Vector{Int64}}(undef, n_agents)
+    idx = 1 # The idx is over circuit
+
+    for i = 1:n_agents
+
+        this_agent_tour = [circuit[idx]]
+        tour_cost = 0
+
+        while tour_cost <= total_cost/n_agents && idx <= length(circuit)
+
+            tour_cost += arc_costs[idx]
+            idx += 1
+            push!(this_agent_tour, circuit[idx])
+
+        end
+
+        # Continue the tour as required
+        if idx < length(circuit)
+
+            @assert idx <= length(circuit) - 2 "Last agent has no package!"
+
+            if circuit[idx] > n_depots # Ends at a site - add next depot
+                idx += 1
+                push!(this_agent_tour, circuit[idx])
+            else
+                # Now it ended at a depot. Only increase idx if next is ALSO a depot
+                if circuit[idx + 1] <= n_depots
+                    idx += 1
+                end
+            end
+        end
+
+        # @show this_agent_tour
+        agent_tours[i] = this_agent_tour
+    end
+
+    return agent_tours
+end
+
+function task_allocation(n_depots::Int64, n_sites::Int64, cost_fn::Function)
+
+    edges, x_edges, vds, dsv, cv = min_connecting_tour(n_depots, n_sites, cost_fn)
+
+    depot_comps = get_connected_depots(n_depots, n_sites, edges)
+
+    add_merged_depot_edges!(x_edges, depot_comps, dsv, n_depots, n_sites, cv)
+
+    circuit = get_multiedge_eulerian_tour(x_edges, vds, n_depots, n_sites, cost_fn)
+
+    trim_circuit(circuit, n_depots)
+
+    agent_tours = cut_tours(circuit)
+
+    return agent_tours
+
+end

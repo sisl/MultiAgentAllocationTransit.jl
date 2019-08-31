@@ -83,7 +83,10 @@ export
     min_connecting_tour,
     get_connected_depots,
     add_merged_depot_edges!,
-    get_multiedge_eulerian_tour
+    get_multiedge_eulerian_tour,
+    trim_circuit!,
+    task_allocation,
+    cut_tours
 
 # Load Transit Env
 export
