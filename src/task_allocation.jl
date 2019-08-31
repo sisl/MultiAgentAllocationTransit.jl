@@ -151,21 +151,23 @@ function get_connected_depots(n_depots::Int64, n_sites::Int64, edges::Vector{Tup
     g = LightGraphs.SimpleDiGraph(adj_mat)
 
     cc = LightGraphs.strongly_connected_components(g)
-
+    
     # cc is an array of arrays
     depot_components = Vector{Vector{Int64}}(undef, 0)
     for c in cc
-        this_comp_depots = Vector{Int64}(undef, 0)
-        for idx in c
-            if idx <= n_depots
-                push!(this_comp_depots, idx)
+        if length(c) > 1
+            this_comp_depots = Vector{Int64}(undef, 0)
+            for idx in c
+                if idx <= n_depots
+                    push!(this_comp_depots, idx)
+                end
             end
+
+            # Each component MUST have a depot
+            @assert ~(isempty(this_comp_depots))
+
+            push!(depot_components, this_comp_depots)
         end
-
-        # Each component MUST have a depot
-        @assert ~(isempty(this_comp_depots))
-
-        push!(depot_components, this_comp_depots)
     end
 
     return depot_components
