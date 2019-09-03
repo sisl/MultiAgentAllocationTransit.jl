@@ -71,7 +71,7 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
     end
     # @show depot_site_mask
     @constraint(model, depot_site_mask * x .<= ones(n_depots*n_sites*2)) # Depot<->site edges at most once
-    @info "Added depot site mask constraints!"
+
     # ALL OTHERS ARE DEPOT-DEPOT right? YES!
 
     # Now add constraints for out-edges and in-edges for sites
@@ -100,7 +100,6 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
 
     @constraint(model, site_out_edge_mask * x .== ones(n_sites))
     @constraint(model, site_in_edge_mask * x .== ones(n_sites))
-    @info "Added site in and out constraints"
 
 
     # Finally, add constraints for in-flow and out-flow from depots
@@ -122,7 +121,6 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
     end
 
     @constraint(model, depot_out_edge_mask * x - depot_in_edge_mask * x .== zeros(n_depots))
-    @info "Added depot in and out constraints"
 
     # Now we optimize!
     JuMP.optimize!(model)
@@ -151,7 +149,7 @@ function get_connected_depots(n_depots::Int64, n_sites::Int64, edges::Vector{Tup
     g = LightGraphs.SimpleDiGraph(adj_mat)
 
     cc = LightGraphs.strongly_connected_components(g)
-    
+
     # cc is an array of arrays
     depot_components = Vector{Vector{Int64}}(undef, 0)
     for c in cc
@@ -164,7 +162,7 @@ function get_connected_depots(n_depots::Int64, n_sites::Int64, edges::Vector{Tup
             end
 
             # Each component MUST have a depot
-            @assert ~(isempty(this_comp_depots))
+            # @assert ~(isempty(this_comp_depots))
 
             push!(depot_components, this_comp_depots)
         end
@@ -184,12 +182,14 @@ function add_merged_depot_edges!(x_edges::Vector{Int64}, depot_comps::Vector{Vec
     while length(merged_depot_comps) > 1
 
         min_to_merge = (0, 0)
+        min_depots_in_merged_comps = (0, 0)
         cmin = Inf
 
         for comp1_idx = 1:length(merged_depot_comps)-1
             for comp2_idx = comp1_idx+1 : length(merged_depot_comps)
 
                 cmin_for_dep_pair = Inf
+                depots_to_merge = (0, 0)
 
                 for dep1 in merged_depot_comps[comp1_idx]
                     for dep2 in merged_depot_comps[comp2_idx]
@@ -198,6 +198,7 @@ function add_merged_depot_edges!(x_edges::Vector{Int64}, depot_comps::Vector{Vec
                                     cost_vector[depot_site_vector_idx[(dep2, dep1)]]
                         if dep_cost < cmin_for_dep_pair
                             cmin_for_dep_pair = dep_cost
+                            depots_to_merge = (dep1, dep2)
                         end
                     end
                 end
@@ -205,15 +206,16 @@ function add_merged_depot_edges!(x_edges::Vector{Int64}, depot_comps::Vector{Vec
                 if cmin_for_dep_pair < cmin
                     cmin = cmin_for_dep_pair
                     min_to_merge = (comp1_idx, comp2_idx)
+                    min_depots_in_merged_comps = depots_to_merge
                 end
             end
         end
 
         # Add edges for merged deps
-        dep1to2 = depot_site_vector_idx[(min_to_merge[1], min_to_merge[2])]
-        @assert x_edges[dep1to2] == 0.0
+        dep1to2 = depot_site_vector_idx[(min_depots_in_merged_comps[1], min_depots_in_merged_comps[2])]
+        @assert x_edges[dep1to2] == 0.0 "$(min_to_merge) \n $(merged_depot_comps)"
         x_edges[dep1to2] = 1.0
-        dep2to1 = depot_site_vector_idx[(min_to_merge[2], min_to_merge[1])]
+        dep2to1 = depot_site_vector_idx[(min_depots_in_merged_comps[2], min_depots_in_merged_comps[1])]
         @assert x_edges[dep2to1] == 0.0
         x_edges[dep2to1] = 1.0
 
@@ -321,7 +323,7 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cos
     arc_costs = [cost_fn(i, j) for (i, j) in zip(circuit[1:end-1], circuit[2:end])]
     total_cost = sum(arc_costs)
 
-    agent_tours = Vector{Vector{Int64}}(undef, n_agents)
+    agent_tours = [Int64[] for _ = 1:n_agents]
     idx = 1 # The idx is over circuit
 
     for i = 1:n_agents
@@ -329,7 +331,7 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cos
         this_agent_tour = [circuit[idx]]
         tour_cost = 0
 
-        while tour_cost <= total_cost/n_agents && idx <= length(circuit)
+        while tour_cost <= total_cost/n_agents && idx < length(circuit)
 
             tour_cost += arc_costs[idx]
             idx += 1
@@ -353,14 +355,17 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cos
             end
         end
 
-        # @show this_agent_tour
         agent_tours[i] = this_agent_tour
+
+        if idx == length(circuit)
+            break
+        end
     end
 
     return agent_tours
 end
 
-function task_allocation(n_depots::Int64, n_sites::Int64, cost_fn::Function)
+function task_allocation(n_depots::Int64, n_sites::Int64, n_agents, cost_fn::Function)
 
     edges, x_edges, vds, dsv, cv = min_connecting_tour(n_depots, n_sites, cost_fn)
 
@@ -370,9 +375,9 @@ function task_allocation(n_depots::Int64, n_sites::Int64, cost_fn::Function)
 
     circuit = get_multiedge_eulerian_tour(x_edges, vds, n_depots, n_sites, cost_fn)
 
-    trim_circuit(circuit, n_depots)
+    trim_circuit!(circuit, n_depots)
 
-    agent_tours = cut_tours(circuit)
+    agent_tours = cut_tours(circuit, n_depots, n_agents, cost_fn)
 
     return agent_tours
 
