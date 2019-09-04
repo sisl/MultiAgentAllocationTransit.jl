@@ -17,14 +17,14 @@ lat_dist = Uniform(city_params.lat_start, city_params.lat_end)
 lon_dist = Uniform(city_params.lon_start, city_params.lon_end)
 
 # Fixing N_depots and N_agents = N_depots
-N_DEPOTS = 10
-depots = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_DEPOTS]
-N_AGENTS = N_DEPOTS
+const N_DEPOTS = 10
+const depots = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_DEPOTS]
+const N_AGENTS = N_DEPOTS
 
 allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_stats"=>Dict())
 
 
-N_SITE_VALS = [N for N in 20:10:100]
+const N_SITE_VALS = [N for N in 20:10:100]
 
 for N_SITES in N_SITE_VALS
 

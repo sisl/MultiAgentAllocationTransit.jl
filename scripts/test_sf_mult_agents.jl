@@ -75,7 +75,6 @@ initial_states = Vector{MAPFTransitVertexState}(undef, length(agent_tasks))
 for i = 1:length(agent_tasks)
     initial_states[i] = env.state_graph.vertices[env.depot_sites_to_vtx[string("d-", agent_tasks[i].origin)]]
 end
-@show initial_states
 
 solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = WEIGHT)
 
