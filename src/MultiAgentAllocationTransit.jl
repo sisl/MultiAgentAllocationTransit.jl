@@ -76,7 +76,8 @@ export
     stop_locations_nearest_neighbors,
     get_stop_idx_to_trip_ids,
     generate_depot_to_sites_dists,
-    true_stop_to_locations
+    true_stop_to_locations,
+    transit_graph_preprocessing
 
 # Task Allocation
 export
@@ -86,7 +87,8 @@ export
     get_multiedge_eulerian_tour,
     trim_circuit!,
     task_allocation,
-    cut_tours
+    cut_tours,
+    get_agent_task_set
 
 # Load Transit Env
 export

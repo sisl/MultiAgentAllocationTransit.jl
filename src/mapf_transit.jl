@@ -250,6 +250,7 @@ function distance_traversed(env::MAPFTransitEnv, s1::MAPFTransitVertexState, s2:
 end
 
 # Heuristic used for both travel time and flight distance
+# TODO: Overhaul
 function distance_heuristic(env::MAPFTransitEnv, sldist::Float64,
                             nn_stop::Int64, nn_dist::Float64, s::MAPFTransitVertexState)
 

@@ -1,6 +1,7 @@
 # cost_fn returns infinite for excluded edges
 # Excluded edges -
 function min_connecting_tour(n_depots::Int64, n_sites::Int64,
+                             depot_sites::Vector{LOC},
                              cost_fn::F) where {LOC, F <: Function}
 
 
@@ -17,7 +18,7 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
 
             # Exclude self-edges and site-site edges
             if i != j && (i <= n_depots || j <= n_depots)
-                edge_cost = cost_fn(i, j)
+                edge_cost = cost_fn(depot_sites[i], depot_sites[j])
                 if edge_cost < Inf
                     # First insert cost and idx
                     push!(cost_vector, edge_cost)
@@ -243,7 +244,7 @@ end
 
 
 function get_multiedge_eulerian_tour(x_edges::Vector{Int64}, vector_idx_to_depot_site::Dict{Int64,Tuple{Int64,Int64}},
-                                     n_depots::Int64, n_sites::Int64, cost_fn::Function)
+                                     n_depots::Int64, n_sites::Int64)
 
     edge_count = zeros(Int64, n_depots+n_sites)
     adj_list = [Int64[] for i = 1:n_depots+n_sites]
@@ -303,10 +304,17 @@ end
 
 # Remove leading and trailing depots except the one just before the
 # first package and the one just after the last package
+# TODO: What if only depots???
 function trim_circuit!(circuit::Vector, n_depots::Int64)
 
     # Trim leading depots
     first_site_idx = findfirst(x -> x > n_depots, circuit)
+
+    if first_site_idx == nothing
+        empty!(circuit)
+        return
+    end
+
     for i = 1:first_site_idx-2
         popfirst!(circuit)
     end
@@ -318,9 +326,10 @@ function trim_circuit!(circuit::Vector, n_depots::Int64)
 
 end
 
-function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cost_fn::Function)
+function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64,
+                   depot_sites::Vector{LOC}, cost_fn::F) where {LOC, F <: Function}
 
-    arc_costs = [cost_fn(i, j) for (i, j) in zip(circuit[1:end-1], circuit[2:end])]
+    arc_costs = [cost_fn(depot_sites[i], depot_sites[j]) for (i, j) in zip(circuit[1:end-1], circuit[2:end])]
     total_cost = sum(arc_costs)
 
     agent_tours = [Int64[] for _ = 1:n_agents]
@@ -342,7 +351,7 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cos
         # Continue the tour as required
         if idx < length(circuit)
 
-            @assert idx <= length(circuit) - 2 "Last agent has no package!"
+            # @assert idx <= length(circuit) - 2 "Last agent has no package!"
 
             if circuit[idx] > n_depots # Ends at a site - add next depot
                 idx += 1
@@ -365,20 +374,50 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64, cos
     return agent_tours
 end
 
-function task_allocation(n_depots::Int64, n_sites::Int64, n_agents, cost_fn::Function)
+function task_allocation(n_depots::Int64, n_sites::Int64, n_agents, depot_sites::Vector{LOC}, cost_fn::F) where {LOC, F <: Function}
 
-    edges, x_edges, vds, dsv, cv = min_connecting_tour(n_depots, n_sites, cost_fn)
+    edges, x_edges, vds, dsv, cv = min_connecting_tour(n_depots, n_sites, depot_sites, cost_fn)
 
     depot_comps = get_connected_depots(n_depots, n_sites, edges)
 
     add_merged_depot_edges!(x_edges, depot_comps, dsv, n_depots, n_sites, cv)
 
-    circuit = get_multiedge_eulerian_tour(x_edges, vds, n_depots, n_sites, cost_fn)
+    circuit = get_multiedge_eulerian_tour(x_edges, vds, n_depots, n_sites)
 
     trim_circuit!(circuit, n_depots)
 
-    agent_tours = cut_tours(circuit, n_depots, n_agents, cost_fn)
+    agent_tours = cut_tours(circuit, n_depots, n_agents, depot_sites, cost_fn)
+
+    # Trip the agent sub-tours also
+    for (i, atour) in enumerate(agent_tours)
+        if ~(isempty(atour))
+            trim_circuit!(agent_tours[i], n_depots)
+        end
+    end
 
     return agent_tours
 
+end
+
+
+
+# This is only used by mapf layer
+# Get the set of AgentTask instances as a tuple of origin, site, dest
+function get_agent_task_set(agent_tours::Vector{Vector{Int64}}, n_depots::Int64,
+                            n_sites::Int64)
+
+    agent_tasks = AgentTask[]
+
+    for (i, atour) in enumerate(agent_tours)
+
+        if length(atour) < 3 # For anything other than dpd'
+            continue
+        end
+
+        @assert atour[1] <= n_depots && atour[2] > n_depots && atour[3] <= n_depots
+
+        push!(agent_tasks, (origin=atour[1], site=atour[2], dest=atour[3]))
+    end
+
+    return agent_tasks
 end

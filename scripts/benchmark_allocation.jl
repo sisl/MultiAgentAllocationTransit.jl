@@ -3,14 +3,15 @@ using Distributions
 using MultiAgentPathFinding
 using MultiAgentAllocationTransit
 using BenchmarkTools
+using Statistics
 using JSON
 
 rng = MersenneTwister(2345)
 
-sf_params_file = "../data/sfmta/sf_params.toml"
-city_params = parse_city_params(sf_params_file)
+params_file = ARGS[1]
+city_params = parse_city_params(params_file)
 
-out_file = "../data/allocation_timing.json"
+out_file = ARGS[2]
 
 lat_dist = Uniform(city_params.lat_start, city_params.lat_end)
 lon_dist = Uniform(city_params.lon_start, city_params.lon_end)
@@ -20,7 +21,8 @@ N_DEPOTS = 10
 depots = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_DEPOTS]
 N_AGENTS = N_DEPOTS
 
-allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_time"=>Dict())
+allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_stats"=>Dict())
+
 
 N_SITE_VALS = [N for N in 20:10:100]
 
@@ -30,14 +32,19 @@ for N_SITES in N_SITE_VALS
 
     depot_sites = vcat(depots, sites)
 
-    cost_fn(i, j) = distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
+    b = @benchmarkable task_allocation($N_DEPOTS, $N_SITES, $N_AGENTS,
+        depot_sites, MultiAgentAllocationTransit.distance_lat_lon_euclidean)  setup=(depot_sites = vcat($depots, [LatLonCoords((lat = rand($rng, $lat_dist), lon = rand($rng, $lon_dist))) for i = 1:$N_SITES]))
 
-    site_time = @belapsed task_allocation($N_DEPOTS, $N_SITES, $N_AGENTS, $cost_fn)
+    t = run(b) # Do once to trigger...something
+    t = run(b)
 
     @show N_SITES
-    @show site_time
+    @show mean(t.times)
 
-    allocation_results["site_time"][N_SITES] = site_time
+    allocation_results["site_stats"][N_SITES] = Dict("mean" => mean(t.times),
+                                                     "median" => median(t.times),
+                                                     "std" => std(t.times),
+                                                     "samples" => t.params.samples)
 
 end
 

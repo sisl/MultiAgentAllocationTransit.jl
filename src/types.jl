@@ -86,7 +86,6 @@ end
 @with_kw struct MAPFTransitConflict <: MAPFConflict
     type::ConflictType
     overlap_vertices::Set{Int64}
-    # overlap_agents::Set{Int64}  # Maps agent ID to overlapping subroutes
     agent_to_state_idx::Dict{Int64,Int64} # Maps overlapping agent ID to index along state vect
     cap::Int64                      = 1
 end

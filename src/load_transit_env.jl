@@ -83,7 +83,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
         vertex_str = string("d-", d)
         new_vtx = MAPFTransitVertexState(idx = idx, state = MAPFTransitState(time = 0.0, location = depot_loc),
                                                     vertex_str = vertex_str)
-        add_vertex!(state_graph, new_vtx)
+        Graphs.add_vertex!(state_graph, new_vtx)
         depot_sites_to_vtx[vertex_str] = idx
     end
 
@@ -92,7 +92,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
         vertex_str = string("s-", s)
         new_vtx = MAPFTransitVertexState(idx = idx, state = MAPFTransitState(time = 0.0, location = site_loc),
                                          vertex_str = vertex_str)
-        add_vertex!(state_graph, new_vtx)
+        Graphs.add_vertex!(state_graph, new_vtx)
         depot_sites_to_vtx[vertex_str] = idx
     end
 
@@ -112,7 +112,7 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
             vertex_str = string("r-", trip_id, "-", seq)
 
             new_vtx = MAPFTransitVertexState(idx = idx, state = state, vertex_str = vertex_str)
-            add_vertex!(state_graph, new_vtx)
+            Graphs.add_vertex!(state_graph, new_vtx)
             range_end += 1
 
         end
@@ -121,4 +121,22 @@ function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG 
     end
 
     return state_graph, depot_sites_to_vtx, trip_to_vtx_range
+end
+
+
+# Take the TG from load_transit_graph_LOC
+function transit_graph_preprocessing(tg::TransitGraph, dist_fn::F) where {F <: Function}
+
+    stop_idx_to_trips = get_stop_idx_to_trip_ids(tg)
+
+    true_stop_to_locs = true_stop_to_locations(tg.stop_to_location, stop_idx_to_trips)
+
+    post_tg = TransitGraph(true_stop_to_locs, tg.transit_trips, tg.transit_capacity)
+
+    trips_fws_dists = trip_meta_graph_fws_dists(post_tg, dist_fn)
+
+    stops_nn_tree, nn_idx_to_stop = stop_locations_nearest_neighbors(post_tg.stop_to_location, EuclideanLatLong())
+
+    return post_tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop
+
 end
