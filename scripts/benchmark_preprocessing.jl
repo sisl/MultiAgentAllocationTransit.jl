@@ -20,8 +20,9 @@ const out_file = ARGS[5]
 const MAX_TRANSIT_CAP = 3
 
 tg = load_transit_graph_latlong(stop_coords_file, trips_file, MAX_TRANSIT_CAP, rng)
+drone_params = parse_drone_params(drone_params_file)
 
-t = @benchmark transit_graph_preprocessing($tg, distance_lat_lon_euclidean)
+t = @benchmark transit_graph_preprocessing($tg, distance_lat_lon_euclidean, $drone_params)
 pp_dict = Dict("city"=>city_params_file,
                "mean"=>mean(t.times),
                "median"=>median(t.times))

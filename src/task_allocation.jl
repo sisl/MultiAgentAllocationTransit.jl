@@ -1,5 +1,6 @@
 # cost_fn returns infinite for excluded edges
-# Excluded edges -
+# TODO : Exclude if depot_sites_dist > limit?
+# TODO : Incorporate travel times
 function min_connecting_tour(n_depots::Int64, n_sites::Int64,
                              depot_sites::Vector{LOC},
                              cost_fn::F) where {LOC, F <: Function}
@@ -354,13 +355,9 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64,
             # @assert idx <= length(circuit) - 2 "Last agent has no package!"
 
             if circuit[idx] > n_depots # Ends at a site - add next depot
+                tour_cost += arc_costs[idx]
                 idx += 1
                 push!(this_agent_tour, circuit[idx])
-            else
-                # Now it ended at a depot. Only increase idx if next is ALSO a depot
-                if circuit[idx + 1] <= n_depots
-                    idx += 1
-                end
             end
         end
 
@@ -388,7 +385,7 @@ function task_allocation(n_depots::Int64, n_sites::Int64, n_agents, depot_sites:
 
     agent_tours = cut_tours(circuit, n_depots, n_agents, depot_sites, cost_fn)
 
-    # Trip the agent sub-tours also
+    # Trim the agent sub-tours also
     for (i, atour) in enumerate(agent_tours)
         if ~(isempty(atour))
             trim_circuit!(agent_tours[i], n_depots)
@@ -416,7 +413,8 @@ function get_agent_task_set(agent_tours::Vector{Vector{Int64}}, n_depots::Int64,
 
         @assert atour[1] <= n_depots && atour[2] > n_depots && atour[3] <= n_depots
 
-        push!(agent_tasks, (origin=atour[1], site=atour[2], dest=atour[3]))
+        # HAVE TO SUBTRACT
+        push!(agent_tasks, (origin=atour[1], site=atour[2]-n_depots, dest=atour[3]))
     end
 
     return agent_tasks

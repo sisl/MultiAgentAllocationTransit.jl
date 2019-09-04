@@ -24,7 +24,7 @@ const N_AGENTS = N_DEPOTS
 allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_stats"=>Dict())
 
 
-const N_SITE_VALS = [N for N in 20:10:100]
+const N_SITE_VALS = [20, 30, 40, 50, 100, 200, 500]
 
 for N_SITES in N_SITE_VALS
 

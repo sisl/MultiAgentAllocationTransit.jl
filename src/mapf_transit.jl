@@ -61,7 +61,6 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
                 for (sj, ((state_j, _), (act_j, _))) in enumerate(zip(sol_j.states[2:end], sol_j.actions))
 
                     # Conflict - boarding vertex at same time
-                    # TODO : Prevent leaving at same time? One leaving, one boarding?
                     if state_i.state == state_j.state && act_i == Board::ActionType && act_j == Board::ActionType
                         return MAPFTransitConflict(type = Transfer::ConflictType,
                                                    overlap_vertices = Set{String}(state_i.idx),
@@ -114,7 +113,6 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
 
             # Check if this marks the start of a link with excess capacity
             # If it does, get the particulars and return conflict
-            # TODO : Is length fine here?
             if length(agent_dict) > route_cap
 
                 overlap_idx = trip_to_vtx_range[1] + wpid - 1
@@ -250,7 +248,6 @@ function distance_traversed(env::MAPFTransitEnv, s1::MAPFTransitVertexState, s2:
 end
 
 # Heuristic used for both travel time and flight distance
-# TODO: Overhaul
 function distance_heuristic(env::MAPFTransitEnv, sldist::Float64,
                             nn_stop::Int64, nn_dist::Float64, s::MAPFTransitVertexState)
 
@@ -313,7 +310,6 @@ function MultiAgentPathFinding.focal_heuristic(env::MAPFTransitEnv, solution::Ve
                 for (sj, ((state_j, _), (act_j, _))) in enumerate(zip(sol_j.states[2:end], sol_j.actions))
 
                     # Conflict - boarding vertex at same time
-                    # TODO : Prevent leaving at same time? One leaving, one boarding?
                     if state_i.state == state_j.state && act_i == Board::ActionType && act_j == Board::ActionType
                         num_conflicts += 1
                     end
@@ -361,7 +357,6 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
     edge_constr_functions = [edge_constr_fn]
 
-    # TODO : Currently dividing max distance by 2
     edge_constraints = [env.drone_params.max_distance]
     # edge_constraints = [Inf]
 
@@ -441,23 +436,29 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
         if tgt_entry.v_idx == orig_idx
             @warn "Agent $(agent_idx) Did not find first sub-path!"
-            return PlanResult{MAPFTransitVertexState, MAPFTransitAction, Float64}()
+
+            # For debugging, just make a direct path
+            cost = elapsed_time(env, s, goal_vtx)
+            states = [(s, 0.0), (goal_vtx, cost)]
+            actions = [(MAPFTransitAction(Fly), 0.0)]
+            fmin = cost
+            env.curr_site_points[agent_idx] = 2
+        else
+
+            # Get sp idxs, costs and weights
+            sp_idxs, cost, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+
+            # Generate plan result for first leg
+            states = [(get_mapf_state_from_idx(env, idx), cost) for idx in sp_idxs]
+            actions = [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])]
+
+            # TODO: Radioactive! Change back when possible
+            # fmin = astar_eps_states.best_fvalue
+            fmin = cost
+
+            # Update the current site points for the agent
+            env.curr_site_points[agent_idx] = length(sp_idxs)
         end
-
-        # Get sp idxs, costs and weights
-        sp_idxs, cost, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
-
-        # Generate plan result for first leg
-        states = [(get_mapf_state_from_idx(env, idx), cost) for idx in sp_idxs]
-        actions = [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])]
-
-        # TODO: Radioactive! Change back when possible
-        # fmin = astar_eps_states.best_fvalue
-        fmin = cost
-
-        # Update the current site points for the agent
-        env.curr_site_points[agent_idx] = length(sp_idxs)
-
     else
         # Copy over previous values
         # Iterate until env.curr_site_points[agt]
@@ -510,16 +511,21 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
        if tgt_entry.v_idx == orig_idx
            @warn "Agent $(agent_idx) Did not find second sub-path!"
-           return PlanResult{MAPFTransitVertexState, MAPFTransitAction, Float64}()
-       end
+           cost_2 = elapsed_time(env, env.state_graph.vertices[orig_idx], goal_vtx)
+           append!(states, [(env.state_graph.vertices[orig_idx], 0.0), (goal_vtx, cost)])
+           append!(actions, [(MAPFTransitAction(Fly), 0.0)])
+       else
 
-        # Extract solution stuff
-        sp_idxs, cost_2, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+            # Extract solution stuff
+            sp_idxs, cost_2, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
-        append!(states, [(get_mapf_state_from_idx(env, idx), cost_2) for idx in sp_idxs[2:end]]) # First element is same as last of prev
-        append!(actions, [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])])
+            append!(states, [(get_mapf_state_from_idx(env, idx), cost_2) for idx in sp_idxs[2:end]]) # First element is same as last of prev
+            append!(actions, [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])])
+        end
+
         cost += cost_2
         fmin += cost_2
+
     else
 
         # @assert env.curr_site_points[agent_idx] > 0
@@ -550,7 +556,8 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
     goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
 
     if goal_vtx.vertex_str == v.vertex_str
-        reset_time(env.state_graph.vertices[env.curr_goal_idx], d)
+        # TODO: Commented out to have a rolling horizon of trips
+        # reset_time(env.state_graph.vertices[env.curr_goal_idx], d)
         return false
     end
 
@@ -581,7 +588,6 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
             end
 
             # Cycle through other trips and add those that can be reached in time
-            # TODO : Don't just add min distance - may be a LONG wait
             for (tid, trip) in enumerate(env.transit_graph.transit_trips)
 
                 # Ignore the current trip id
@@ -608,6 +614,9 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
         # @info "Goal added by ", v.idx
         push!(nbrs, env.curr_goal_idx)
     end
+
+    # @show v
+    # @show nbrs
 
     return true
 end
