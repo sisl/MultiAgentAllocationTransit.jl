@@ -1,7 +1,8 @@
 ## Takes in a transit graph
 ## Computes the minimum flight distance between each pair of trips
 ## Then runs FWS on the Time-Invariant Meta Route graph
-function trip_meta_graph_fws_dists(tg::TG, dist_fn::Function) where {TG <: TransitGraph}
+function trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
+                                   drone_params::DroneParams) where {TG <: TransitGraph}
 
     n_trips = length(tg.transit_trips)
 
@@ -12,14 +13,7 @@ function trip_meta_graph_fws_dists(tg::TG, dist_fn::Function) where {TG <: Trans
     for i = 1:n_trips
         trip1 = tg.transit_trips[i]
         for j = 1:n_trips
-
-            if i >= j
-                dists[i, j] = dists[j, i]
-                continue
-            end
-
             trip2 = tg.transit_trips[j]
-
             mindist = Inf
 
             # Iterate over both trips and compute min distance
@@ -28,13 +22,12 @@ function trip_meta_graph_fws_dists(tg::TG, dist_fn::Function) where {TG <: Trans
 
                     dist = dist_fn(tg.stop_to_location[rwp1.stop_id], tg.stop_to_location[rwp2.stop_id])
 
-                    if dist < mindist
+                    if drone_params.avg_speed * (rwp2.arrival_time - rwp1.arrival_time) > dist && dist < mindist
                         mindist = dist
                     end
                 end
             end
 
-            @assert mindist != Inf "Min dist for trips $i and $j is Inf!"
             dists[i, j] = mindist
         end
     end
@@ -118,7 +111,6 @@ end
 
 # Compute the minimum pairwise distance between depots and sites either through direct flight
 # OR by using the Time Invariant Route Graph
-# This is SYMMETRIC on the time-invariant route graph
 function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, stops_nn_tree::NNTree,
                                        nn_idx_to_stop::Vector{Int64}, stop_idx_to_trips::Dict{Int64,Set{Int64}},
                                        trips_fws_dists::Matrix{Float64}, dist_fn::Function)
