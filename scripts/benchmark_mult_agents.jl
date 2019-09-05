@@ -19,10 +19,10 @@ const bb_params_file = ARGS[5]
 const out_file = ARGS[6]
 
 # MAPF-TN params
-const MAX_TRANSIT_CAP = 2
+const TRANSIT_CAP_RANGE = (3, 5)
 const ECBS_WEIGHT = 1.05
-const N_DEPOT_VALS = [20]
-const N_AGENT_VALS = [5, 10, 15, 20, 30, 50, 75, 100] # n_sites = 3 * agents
+const N_DEPOT_VALS = [3, 5, 10, 15, 20]
+const N_AGENT_VALS = [5, 10, 15, 20, 30, 50, 75, 100, 200] # n_sites = 3 * agents
 
 function main()
 
@@ -35,19 +35,23 @@ function main()
     lon_dist = Uniform(bb_params.lon_start, bb_params.lon_end)
 
     # Transit Graph Preprocessing
-    tg = load_transit_graph_latlong(stop_coords_file, trips_file, MAX_TRANSIT_CAP, rng)
+    tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
     tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
                     transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
 
 
-    mapf_results = Dict{Int64,Dict}()
+    mapf_results = Dict("cap_range"=>TRANSIT_CAP_RANGE, "weight"=>ECBS_WEIGHT, "results"=>Dict())
 
     for N_DEPOTS in N_DEPOT_VALS
 
         depot_results = Dict()
 
         for N_AGENTS in N_AGENT_VALS
+
+            if N_AGENTS < N_DEPOTS || N_AGENTS > N_DEPOTS*10
+                continue
+            end
 
             N_SITES = 3 * N_AGENTS
 
@@ -107,7 +111,7 @@ function main()
             #                                     "std" => std(t.times))
         end
 
-        mapf_results[N_DEPOTS] = depot_results
+        mapf_results["results"][N_DEPOTS] = depot_results
     end
 
     open(out_file, "w") do f

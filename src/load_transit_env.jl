@@ -26,7 +26,7 @@ end
 
 
 function load_transit_graph_latlong(stop_coords_file::String, trips_file::String,
-                                    max_transit_capacity::Int64, rng::RNG) where {RNG <: AbstractRNG}
+                                    transit_cap_range::Tuple{Int64,Int64}, rng::RNG) where {RNG <: AbstractRNG}
 
     # Load stop to locations
     stop_to_location = Dict{Int64,LatLonCoords}()
@@ -65,7 +65,7 @@ function load_transit_graph_latlong(stop_coords_file::String, trips_file::String
     end
 
 
-    transit_capacity = [rand(rng, 1:max_transit_capacity) for _ =  1:length(transit_trips)]
+    transit_capacity = [rand(rng, transit_cap_range[1]:transit_cap_range[2]) for _ =  1:length(transit_trips)]
 
     return TransitGraph(stop_to_location, transit_trips, transit_capacity)
 
