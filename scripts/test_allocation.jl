@@ -33,6 +33,7 @@ n_sites = 5
 #
 # # Get Eulerian circuit
 # circuit = get_multiedge_eulerian_tour(x_edges, vds, n_depots, n_sites, cost_fn)
-agent_tours = task_allocation(n_depots, n_sites, n_agents, depot_sites, distance_lat_lon_euclidean)
+cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
+agent_tours = task_allocation(n_depots, n_sites, n_agents, depot_sites, cost_fn)
 
 # agent_tasks = get_agent_task_set(agent_tours, n_depots, n_sites)

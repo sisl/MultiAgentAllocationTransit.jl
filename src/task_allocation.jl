@@ -19,7 +19,7 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
 
             # Exclude self-edges and site-site edges
             if i != j && (i <= n_depots || j <= n_depots)
-                edge_cost = cost_fn(depot_sites[i], depot_sites[j])
+                edge_cost = cost_fn(i, j)
                 if edge_cost < Inf
                     # First insert cost and idx
                     push!(cost_vector, edge_cost)
@@ -330,7 +330,7 @@ end
 function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64,
                    depot_sites::Vector{LOC}, cost_fn::F) where {LOC, F <: Function}
 
-    arc_costs = [cost_fn(depot_sites[i], depot_sites[j]) for (i, j) in zip(circuit[1:end-1], circuit[2:end])]
+    arc_costs = [cost_fn(i, j) for (i, j) in zip(circuit[1:end-1], circuit[2:end])]
     total_cost = sum(arc_costs)
 
     agent_tours = [Int64[] for _ = 1:n_agents]

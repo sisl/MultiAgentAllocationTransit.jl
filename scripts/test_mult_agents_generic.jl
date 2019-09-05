@@ -19,12 +19,12 @@ const bb_params_file = "./data/sfmta/sf_bb_params.toml"
 const out_file = "./data/temp_mult_generic.json"
 
 # MAPF-TN params
-const MAX_TRANSIT_CAP = 3
+const TRANSIT_CAP_RANGE = (3, 5)
 const ECBS_WEIGHT = 1.05
 const N_DEPOTS = 3
 
 # Change this one
-const N_AGENTS = 100
+const N_AGENTS = 10
 
 const N_SITES = 2*N_AGENTS
 
@@ -42,7 +42,7 @@ lat_dist = Uniform(bb_params.lat_start, bb_params.lat_end)
 lon_dist = Uniform(bb_params.lon_start, bb_params.lon_end)
 
 # Transit Graph Preprocessing
-tg = load_transit_graph_latlong(stop_coords_file, trips_file, MAX_TRANSIT_CAP, rng)
+tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
 tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
                 transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
@@ -56,19 +56,27 @@ depot_to_sites_dists = generate_depot_to_sites_dists(otg, tg, stops_nn_tree, nn_
 state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 
 
+# Set the cost function using the wrapper
+env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
+                     agent_tasks = AgentTask[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
+                     stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
+                     trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
+                     drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+                     curr_site_points = [])
+
+cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
+
+
 agent_tours = task_allocation(N_DEPOTS, N_SITES, N_AGENTS,
-                              depot_sites, MultiAgentAllocationTransit.distance_lat_lon_euclidean)
+                              depot_sites, cost_fn)
 agent_tasks = get_agent_task_set(agent_tours, N_DEPOTS, N_SITES)
 
 true_n_agents = length(agent_tasks)
 @show true_n_agents
 
-env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
-                     agent_tasks = agent_tasks, depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                     stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                     trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
-                     drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                     curr_site_points = [0 for _ = 1:true_n_agents])
+
+env.agent_tasks = agent_tasks
+env.curr_site_points = [0 for _ = 1:true_n_agents]
 
 initial_states = Vector{MAPFTransitVertexState}(undef, true_n_agents)
 for i = 1:true_n_agents

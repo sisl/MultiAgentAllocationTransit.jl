@@ -627,3 +627,67 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
 
     return true
 end
+
+
+
+# Run a single search over a snapshot of the transit network to get the travel time
+# If not reachable, then return Inf
+function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
+
+    # Get origin idx and destination idx
+    # No need to reset as must be zero
+    orig_idx = env.depot_sites_to_vtx[orig_str]
+    env.curr_goal_idx = env.depot_sites_to_vtx[goal_str]
+
+    edge_wt_fn(u, v) = elapsed_time(env, u, v)
+    edge_constr_fn(u, v) = distance_traversed(env, u, v)
+    edge_constr_functions = [edge_constr_fn]
+    edge_constraints = [env.drone_params.max_distance]
+    admissible_heuristic(u) = elapsed_time_heuristic(env, u)
+    focal_state_heuristic(u) = 0.0
+    focal_transition_heuristic(u, v) = 0.0
+    dist_heur(u) = 0.0  # Keep this simple
+    edge_constr_heuristics = [dist_heur]
+
+    vis = MAPFTransitGoalVisitor(env, Set{Int64}())
+
+    astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+                                                                           edge_wt_fn,
+                                                                           orig_idx, vis, weight,
+                                                                           admissible_heuristic,
+                                                                           focal_state_heuristic,
+                                                                           focal_transition_heuristic,
+                                                                           edge_constr_functions,
+                                                                           edge_constr_heuristics,
+                                                                           edge_constraints)
+
+    if tgt_entry.v_idx == orig_idx
+        @warn "In allocation, edge from $(orig_str) to $(goal_str) is empty!"
+        return Inf
+    end
+
+
+    sp_idxs, cost, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+
+    return cost
+end
+
+
+function allocation_cost_fn_wrapper(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
+                                    orig_ds_idx::Int64, goal_ds_idx::Int64)
+
+    # Compute the origin and goal strings
+    if orig_ds_idx > n_depots
+        orig_str = string("s-", (orig_ds_idx - n_depots))
+    else
+        orig_str = string("d-", orig_ds_idx)
+    end
+
+    if goal_ds_idx > n_depots
+        goal_str = string("s-", (goal_ds_idx - n_depots))
+    else
+        goal_str = string("d-", goal_ds_idx)
+    end
+
+    return get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
+end

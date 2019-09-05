@@ -31,9 +31,10 @@ for N_SITES in N_SITE_VALS
     sites = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_SITES]
 
     depot_sites = vcat(depots, sites)
+    cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
 
     b = @benchmarkable task_allocation($N_DEPOTS, $N_SITES, $N_AGENTS,
-        depot_sites, MultiAgentAllocationTransit.distance_lat_lon_euclidean)  setup=(depot_sites = vcat($depots, [LatLonCoords((lat = rand($rng, $lat_dist), lon = rand($rng, $lon_dist))) for i = 1:$N_SITES]))
+        depot_sites, $cost_fn)  setup=(depot_sites = vcat($depots, [LatLonCoords((lat = rand($rng, $lat_dist), lon = rand($rng, $lon_dist))) for i = 1:$N_SITES]))
 
     t = run(b) # Do once to trigger...something
     t = run(b)
