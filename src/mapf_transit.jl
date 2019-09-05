@@ -62,9 +62,11 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
 
                     # Conflict - boarding vertex at same time
                     if state_i.state == state_j.state && act_i == Board::ActionType && act_j == Board::ActionType
-                        return MAPFTransitConflict(type = Transfer::ConflictType,
+
+                        conflict = MAPFTransitConflict(type = Transfer::ConflictType,
                                                    overlap_vertices = Set{String}(state_i.idx),
                                                    agent_to_state_idx = Dict(i => si+1, j => sj+1)) # +1 because enumerating from 2
+                        return conflict
                     end
                 end
             end
@@ -135,10 +137,12 @@ function MultiAgentPathFinding.get_first_conflict(env::MAPFTransitEnv,
                 # @show overlap_verts
                 # @show agent_dict
                 # readline()
-                return MAPFTransitConflict(type = Capacity::ConflictType,
+                conflict = MAPFTransitConflict(type = Capacity::ConflictType,
                                            overlap_vertices = overlap_verts,
                                            agent_to_state_idx = agent_dict,
                                            cap = route_cap)
+                # @show conflict.type
+                return conflict
             end
         end
     end
@@ -166,6 +170,8 @@ function MultiAgentPathFinding.create_constraints_from_conflict(env::MAPFTransit
                                                                    towards => Set{Int64}()))
             end
         end
+
+        # @show [res_constraints]
         return [res_constraints]
 
     else
@@ -207,6 +213,7 @@ function MultiAgentPathFinding.create_constraints_from_conflict(env::MAPFTransit
         # @show res_constraint_set[2]
         # readline()
 
+        # @show res_constraint_set
         return res_constraint_set
     end
 end
@@ -297,7 +304,7 @@ end
 # Just count the boarding conflicts, if any?
 function MultiAgentPathFinding.focal_heuristic(env::MAPFTransitEnv, solution::Vector{PR}) where {PR <: PlanResult}
 
-    num_conflicts = 0
+    num_potential_conflicts = 0
 
     # First look for boarding/alighting constraints
     # But simultaneously note transit capacity usage
@@ -310,15 +317,15 @@ function MultiAgentPathFinding.focal_heuristic(env::MAPFTransitEnv, solution::Ve
                 for (sj, ((state_j, _), (act_j, _))) in enumerate(zip(sol_j.states[2:end], sol_j.actions))
 
                     # Conflict - boarding vertex at same time
-                    if state_i.state == state_j.state && act_i == Board::ActionType && act_j == Board::ActionType
-                        num_conflicts += 1
+                    if state_i.state == state_j.state
+                        num_potential_conflicts += 1
                     end
                 end
             end
         end
     end
 
-    return num_conflicts
+    return num_potential_conflicts
 end
 
 function reachable_by_agent(env::MAPFTransitEnv, s1::MAPFTransitState, s2::MAPFTransitState)
