@@ -47,7 +47,8 @@ export
     MAPFTransitAction,
     MAPFTransitConflict,
     MAPFTransitConstraints,
-    AgentTask
+    AgentTask,
+    AgentState
 
 # Utils
 export
@@ -86,8 +87,8 @@ export
     add_merged_depot_edges!,
     get_multiedge_eulerian_tour,
     trim_circuit!,
-    task_allocation,
     cut_tours,
+    task_allocation,
     get_agent_task_set
 
 # Load Transit Env
@@ -100,8 +101,8 @@ export
 
 # MAPF Transit
 export
-    get_depot_to_site_travel_time,
-    allocation_cost_fn_wrapper
+    allocation_cost_fn_wrapper,
+    update_agent_states!
 
 
 include("types.jl")

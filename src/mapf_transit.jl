@@ -161,7 +161,7 @@ function MultiAgentPathFinding.create_constraints_from_conflict(env::MAPFTransit
         res_constraints = Dict{Int64,MAPFTransitConstraints}()
 
         # Obtain the kind of subpath
-        for (agt, state_idx) in conflcit.agent_to_state_idx
+        for (agt, state_idx) in conflict.agent_to_state_idx
             if state_idx < env.curr_site_points[agt] # Must be greater or less
                 res_constraints[agt] = MAPFTransitConstraints(Dict(towards => conflict.overlap_vertices,
                                                                    from => Set{Int64}()))
@@ -222,14 +222,12 @@ end
 function elapsed_time(env::MAPFTransitEnv,
                       s1::MAPFTransitVertexState, s2::MAPFTransitVertexState)
 
-    if s2.state.time == 0.0
-
+    if startswith(s2.vertex_str, "r") == true
+        return (s2.state.time - s1.state.time)
+    else
         # Compute distance between s1 and s2 and divide by avg speed
         dist = env.dist_fn(s1.state.location, s2.state.location)
         return dist/env.drone_params.avg_speed
-
-    else
-        return (s2.state.time - s1.state.time)
     end
 end
 
@@ -255,8 +253,7 @@ function distance_traversed(env::MAPFTransitEnv, s1::MAPFTransitVertexState, s2:
 end
 
 # Heuristic used for both travel time and flight distance
-function distance_heuristic(env::MAPFTransitEnv, sldist::Float64,
-                            nn_stop::Int64, nn_dist::Float64, s::MAPFTransitVertexState)
+function distance_heuristic(env::MAPFTransitEnv, nn_dist::Float64, nn_stop::Int64, s::MAPFTransitVertexState)
 
     # Now do different things based on whether s is depot/site or vertex
     ssplit = split(s.vertex_str, "-")
@@ -270,10 +267,9 @@ function distance_heuristic(env::MAPFTransitEnv, sldist::Float64,
             min_trip_to_trip = (env.trips_fws_dists[trip_id, nn_trip_id] < min_trip_to_trip) ?  env.trips_fws_dists[trip_id, nn_trip_id] : min_trip_to_trip
         end
 
-        return (nn_dist + min_trip_to_trip)
+        return nn_dist + min_trip_to_trip
     else
-
-        return sldist
+        return 0.0
     end
 end
 
@@ -334,177 +330,132 @@ function reachable_by_agent(env::MAPFTransitEnv, s1::MAPFTransitState, s2::MAPFT
 end
 
 
-# Runs low level search from depot to site, and then to depot
-# FURTHER tasks can be run as separate chunks
-# Info for each agent available as agent_tasks
+# Run low level search from current state for agent_idx
+# Agent task is obtained from env.agent_states
+# If site is crossed, don't need to care about that
+# TODO: A search from a depot/site is done with time 0, rest done from current time
 function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::Int64,
                                                  s::MAPFTransitVertexState, constraints::MAPFTransitConstraints,
                                                  solution::Vector{PR}) where {PR <: PlanResult}
 
     env = solver.env
+    agent_state = env.agent_states[agent_idx]
 
-    # First run the search from origin to site
-    # Reset the times of origin and site
-    agt_task = env.agent_tasks[agent_idx]
-    orig_str = string("d-", agt_task.origin)
-    orig_idx = env.depot_sites_to_vtx[orig_str]
-    reset_time(env.state_graph.vertices[orig_idx])
-
-    goal_str = string("s-", agt_task.site)
-    env.curr_goal_idx = env.depot_sites_to_vtx[goal_str]
-    reset_time(env.state_graph.vertices[env.curr_goal_idx])
-
-
-    # Need the following
-    # Edge weight function - Just the elapsed time difference
+    # set up heuristics regardless
+    # Set up the weight and heuristic functions
     edge_wt_fn(u, v) = elapsed_time(env, u, v)
 
-    # Edge constraint function
     edge_constr_fn(u, v) = distance_traversed(env, u, v)
-
     edge_constr_functions = [edge_constr_fn]
 
-    edge_constraints = [env.drone_params.max_distance]
-    # edge_constraints = [Inf]
+    edge_constraints = [env.drone_params.max_distance - agent_state.dist_flown] # TODO: Check this!!!
 
-    # Admissible heuristics
     admissible_heuristic(u) = elapsed_time_heuristic(env, u)
 
-    # Inadmissible heuristics
     focal_state_heuristic(u) = 0.0
     focal_transition_heuristic(u, v) = focal_transition_heuristic_transit(env, solution, agent_idx, u, v)
 
 
-    # Constraint heuristic
-    # Only run first search if soln empty OR constraints in towards
-    if isempty(solution) || ~(isempty(constraints.avoid_vertex_map[towards]))
+    # Don't reset initial time
+    orig_idx = s.idx
 
-        sldist_heur = env.depot_to_sites_dists[agt_task.origin, agt_task.site]
-        goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
-        goal_vtx_loc_vect = convert_to_vector(goal_vtx.state.location)
-        nn_idxs, nn_dists = knn(env.stops_nn_tree, goal_vtx_loc_vect, 1)
-        nn_idx = nn_idxs[1]
-        nn_dist = nn_dists[1]
-        nn_stop = env.nn_idx_to_stop[nn_idx]
-        dist_heur(u) = distance_heuristic(env, sldist_heur, nn_stop, nn_dist, u)
-        edge_constr_heuristics = [dist_heur]
+    cost = 0.0
+    fmin = 0.0
 
-        # RUN SEARCH
+    # ONLY run first search if site not crossed
+    if agent_state.site_crossed == false
 
-        vis = MAPFTransitGoalVisitor(env, constraints.avoid_vertex_map[towards])
+        # Then goal is the site
+        goal_str = goal_str = string("s-", agent_state.task.site)
+        env.curr_goal_idx = env.depot_sites_to_vtx[goal_str]
 
 
+        # Note - don't really need an sl dist heuristic
+        # Since you are beginning the search anyway
+        if isempty(solution) || ~(isempty(constraints.avoid_vertex_map[towards]))
 
-        astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
-                                                                               edge_wt_fn,
-                                                                               orig_idx, vis, solver.weight,
-                                                                               admissible_heuristic,
-                                                                               focal_state_heuristic,
-                                                                               focal_transition_heuristic,
-                                                                               edge_constr_functions,
-                                                                               edge_constr_heuristics,
-                                                                               edge_constraints)
+            goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
+            goal_vtx_loc_vect = convert_to_vector(goal_vtx.state.location)
+            nn_idxs, nn_dists = knn(env.stops_nn_tree, goal_vtx_loc_vect, 1)
+            nn_idx = nn_idxs[1]
+            nn_dist = nn_dists[1]
+            nn_stop = env.nn_idx_to_stop[nn_idx]
+            dist_heur_1(u) = distance_heuristic(env, nn_dist, nn_stop, u)
 
-    ## A* epsilon
-    # @time a_star_eps_states = a_star_light_epsilon_shortest_path_implicit!(env.state_graph,
-    #                                                            edge_wt_fn, orig_idx,
-    #                                                            vis, solver.weight,
-    #                                                            admissible_heuristic,
-    #                                                            focal_state_heuristic,
-    #                                                            focal_transition_heuristic,
-    #                                                            Float64)
-    # sp_idxs = shortest_path_indices(a_star_eps_states.parent_indices, env.state_graph,
-    #                                 orig_idx, env.curr_goal_idx)
-    # @show sp_idxs
-    # @show [env.state_graph.vertices[s] for s in sp_idxs]
-    # readline()
+            vis = MAPFTransitGoalVisitor(env, constraints.avoid_vertex_map[towards])
 
-    ## A* normal
-    # @time a_star_states = a_star_light_shortest_path_implicit!(env.state_graph, edge_wt_fn, orig_idx, vis, admissible_heuristic)
-    # sp_idxs = shortest_path_indices(a_star_states.parent_indices, env.state_graph,
-    #                                 orig_idx, env.curr_goal_idx)
-    # @show sp_idxs
-    # @show [env.state_graph.vertices[s] for s in sp_idxs]
-    # @show a_star_states.dists[env.curr_goal_idx]
-    # readline()
 
-    ## A* - constrained
-    # @time astar_states, tgt_entry = a_star_constrained_shortest_path_implicit!(env.state_graph,
-    #                                                                        edge_wt_fn,
-    #                                                                        orig_idx, vis,  admissible_heuristic,
-    #                                                                        edge_constr_functions,
-    #                                                                        edge_constr_heuristics,
-    #                                                                        edge_constraints)
-    # sp_idxs, cost, wts = shortest_path_cost_weights(astar_states, env.state_graph, orig_idx, tgt_entry)
-    # @show sp_idxs
-    # @show [env.state_graph.vertices[s] for s in sp_idxs]
-    # @show cost
-    # readline()
 
-        if tgt_entry.v_idx == orig_idx
-            @warn "Agent $(agent_idx) Did not find first sub-path!"
+            astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+                                                                                   edge_wt_fn,
+                                                                                   orig_idx, vis, solver.weight,
+                                                                                   admissible_heuristic,
+                                                                                   focal_state_heuristic,
+                                                                                   focal_transition_heuristic,
+                                                                                   edge_constr_functions,
+                                                                                   [dist_heur_1],
+                                                                                   edge_constraints)
 
-            # For debugging, just make a direct path
-            cost = elapsed_time(env, s, goal_vtx)
-            states = [(s, 0.0), (goal_vtx, cost)]
-            actions = [(MAPFTransitAction(Fly), 0.0)]
-            fmin = cost
-            env.curr_site_points[agent_idx] = 2
+            # IMP - Need to sort out solution
+            if tgt_entry.v_idx == orig_idx
+                @warn "Agent $(agent_idx) Did not find first sub-path!"
+
+                env.any_invalid_path = true
+
+                # For debugging, make a direct path with distance
+                cost = elapsed_time(env, s, goal_vtx)
+                weight = distance_traversed(env, s, goal_vtx)
+
+                states = [(s, s.state.time + 0.0), (goal_vtx, s.state.time + cost)]
+                actions = [(MAPFTransitAction(Fly), weight)]
+                fmin = cost
+                env.curr_site_points[agent_idx] = 2
+
+            else
+
+                sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+
+                cost = costs[end]
+
+                states = [(get_mapf_state_from_idx(env, idx), s.state.time + c) for (idx, c) in zip(sp_idxs, costs)]
+                actions = [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))]
+                fmin = cost
+
+                env.curr_site_points[agent_idx] = length(sp_idxs)
+            end
+
         else
+            # Copy over previous values
+            @debug "Copying over subpart towards of agent $(agent_idx)"
 
-            # Get sp idxs, costs and weights
-            sp_idxs, cost, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
-
-            # Generate plan result for first leg
-            states = [(get_mapf_state_from_idx(env, idx), cost) for idx in sp_idxs]
-            actions = [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])]
-
-            # TODO: Radioactive! Change back when possible
-            # fmin = astar_eps_states.best_fvalue
+            states = solution[agent_idx].states[1 : env.curr_site_points[agent_idx]]
+            actions = solution[agent_idx].actions[1 : env.curr_site_points[agent_idx] - 1]
+            cost = states[end][2]
             fmin = cost
 
-            # Update the current site points for the agent
-            env.curr_site_points[agent_idx] = length(sp_idxs)
         end
-    else
-        # Copy over previous values
-        # Iterate until env.curr_site_points[agt]
-        # @assert env.curr_site_points[agent_idx] > 0
 
-        @debug "Copying over subpart towards of agent $(agent_idx)"
+        # Reset stateful things for next search
+        orig_str = string("s-", agent_state.task.site)
+        orig_idx = env.depot_sites_to_vtx[orig_str]
+        edge_constraints = [env.drone_params.max_distance]
 
-        states = solution[agent_idx].states[1 : env.curr_site_points[agent_idx]]
-        actions = solution[agent_idx].actions[1 : env.curr_site_points[agent_idx]]
-        cost = states[end][2] # Copy cost of last
-        fmin = cost
     end
 
-    # Now run second part of the search
-
-    # Now set the new origin but DON'T reset
-    orig_str = string("s-", agt_task.site)
-    orig_idx = env.depot_sites_to_vtx[orig_str]
-
-    # Now set goal and reset
-    goal_str = string("d-", agt_task.dest)
+    goal_str = string("d-", agent_state.task.dest)
     env.curr_goal_idx = env.depot_sites_to_vtx[goal_str]
-    reset_time(env.state_graph.vertices[env.curr_goal_idx])
-
 
     if isempty(solution) || ~(isempty(constraints.avoid_vertex_map[from]))
 
-        # Only need to reset the constraint heuristic
-        sldist_heur = env.depot_to_sites_dists[agt_task.dest, agt_task.site]
         goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
         goal_vtx_loc_vect = convert_to_vector(goal_vtx.state.location)
         nn_idxs, nn_dists = knn(env.stops_nn_tree, goal_vtx_loc_vect, 1)
         nn_idx = nn_idxs[1]
         nn_dist = nn_dists[1]
         nn_stop = env.nn_idx_to_stop[nn_idx]
-        dist_heur_2(u) = distance_heuristic(env, sldist_heur, nn_stop, nn_dist, u)
-        edge_constr_heuristics_2 = [dist_heur_2]
+        dist_heur_2(u) = distance_heuristic(env, nn_dist, nn_stop, u)
 
-        # RUn second search
+
         vis = MAPFTransitGoalVisitor(env, constraints.avoid_vertex_map[from])
         astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
                                                                                edge_wt_fn,
@@ -513,21 +464,29 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
                                                                                focal_state_heuristic,
                                                                                focal_transition_heuristic,
                                                                                edge_constr_functions,
-                                                                               edge_constr_heuristics_2,
+                                                                               [dist_heur_2],
                                                                                edge_constraints)
 
-       if tgt_entry.v_idx == orig_idx
-           @warn "Agent $(agent_idx) Did not find second sub-path!"
-           cost_2 = elapsed_time(env, env.state_graph.vertices[orig_idx], goal_vtx)
-           append!(states, [(env.state_graph.vertices[orig_idx], 0.0), (goal_vtx, cost)])
-           append!(actions, [(MAPFTransitAction(Fly), 0.0)])
-       else
 
-            # Extract solution stuff
-            sp_idxs, cost_2, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+        if tgt_entry.v_idx == orig_idx
+            @warn "Agent $(agent_idx) Did not find second sub-path!"
 
-            append!(states, [(get_mapf_state_from_idx(env, idx), cost_2) for idx in sp_idxs[2:end]]) # First element is same as last of prev
-            append!(actions, [(get_mapf_action(env, u, v), 0.0) for (u, v) in zip(sp_idxs[1:end-1], sp_idxs[2:end])])
+            env.any_invalid_path = true
+
+            cost_2 = elapsed_time(env, env.state_graph.vertices[orig_idx], goal_vtx)
+            weight = distance_traversed(env, env.state_graph.vertices[orig_idx], goal_vtx)
+
+            append!(states, [(goal_vtx, s.state.time + cost_2)])
+            append!(actions, [(MAPFTransitAction(Fly),weight)])
+
+        else
+
+            sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+
+            cost_2 = costs[end]
+
+            append!(states, [(get_mapf_state_from_idx(env, idx), s.state.time + cost + c) for (idx, c) in zip(sp_idxs[2:end], costs[2:end])])
+            append!(actions, [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))])
         end
 
         cost += cost_2
@@ -535,18 +494,63 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
     else
 
-        # @assert env.curr_site_points[agent_idx] > 0
-
         @debug "Copying over subpart from of agent $(agent_idx)"
 
         append!(states, solution[agent_idx].states[env.curr_site_points[agent_idx] + 1 : end])
         append!(actions, solution[agent_idx].actions[env.curr_site_points[agent_idx] : end])
-        cost += states[end][2] # Copy cost of last
+        cost += states[end][2]
         fmin += states[end][2]
     end
 
+    # Update the next finish time of agent
+    env.agent_states[agent_idx].next_finish_time = cost
+
     return PlanResult{MAPFTransitVertexState, MAPFTransitAction, Float64}(states, actions, cost, fmin)
 end
+
+# Returns the next state of each agent based on its currently executing solution
+# Also updates the site_crossed flag if so
+# TODO: Assumes that solution[i].states has the correct tuple of (state, cost)
+# Also assumes that agent has not finished yet
+# Also assumes that solution[i].actions tracks the weight costs
+function update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
+                              solution::Vector{PR}) where {PR <: PlanResult}
+
+    @assert time_val < env.agent_states[agent_idx].route_finish_time "Agent $(agent_idx) has already finished at time $(time)!"
+
+    agt_soln_states = solution[agent_idx].states
+    agt_soln_actions = solution[agent_idx].actions
+
+    state_idx = 0
+
+    # Iterate over agent_states until first state after time
+    for (si, (state, t)) in enumerate(agt_soln_states)
+        if t >= time_val
+            state_idx = si
+            break
+        end
+    end
+
+    # Now deal with state_idx
+    @assert state_idx < length(agt_soln_states) "Agent $(agent_idx) has inconsistent time trajectory!"
+
+    dist_start_idx = 1
+    if state_idx >= env.curr_site_points[agent_idx]
+        env.agent_states[agent_idx].site_crossed = true
+        dist_start_idx = env.curr_site_points[agent_idx]
+    end
+
+    dist_flown = 0.0
+    for i = dist_start_idx:state_idx-1
+        dist_flown += agt_soln_actions[i][2]
+    end
+
+    env.agent_states[agent_idx].dist_flown = dist_flown
+
+    return agt_soln_states[state_idx][1] # That's the state
+end
+
+
 
 
 mutable struct MAPFTransitGoalVisitor <: AbstractDijkstraVisitor

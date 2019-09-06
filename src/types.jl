@@ -119,12 +119,21 @@ end
 const AgentTask = NamedTuple{(:origin, :site, :dest)}
 
 
+# Tracks the current state of the agent
+@with_kw mutable struct AgentState
+    task::AgentTask
+    site_crossed::Bool              = false
+    next_finish_time::Float64       = 0.0
+    dist_flown::Float64             = 0.0
+end
+
+
 @with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph,
                                        TG <: TransitGraph, NN <: NNTree, MVTS <: MAPFTransitVertexState} <: MAPFEnvironment
     off_transit_graph::OTG
     transit_graph::TG
     state_graph::SimpleVListGraph{MVTS}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
-    agent_tasks::Vector{AgentTask}
+    agent_states::Vector{AgentState}
     depot_sites_to_vtx::Dict{String,Int64}                          # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
     trip_to_vtx_range::Vector{Tuple{Int64,Int64}}
     stops_nn_tree::NN                                               # Nearest neighbor tree for stop locations
@@ -138,6 +147,7 @@ const AgentTask = NamedTuple{(:origin, :site, :dest)}
     curr_goal_idx::Int64                                    = 0
     # Diagnostics
     num_transit_options::Int64                              = 0
+    any_invalid_path::Bool                                  = false
 end
 
 
