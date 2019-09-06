@@ -359,8 +359,10 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     # Don't reset initial time
     orig_idx = s.idx
 
-    cost = 0.0
-    fmin = 0.0
+    states = Tuple{MAPFTransitVertexState,Float64}[]
+    actions = Tuple{MAPFTransitAction,Float64}[]
+
+    first_cost = env.plan_ref_times[agent_idx]
 
     # ONLY run first search if site not crossed
     if agent_state.site_crossed == false
@@ -403,23 +405,21 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
                 env.any_invalid_path = true
 
                 # For debugging, make a direct path with distance
-                cost = elapsed_time(env, s, goal_vtx)
                 weight = distance_traversed(env, s, goal_vtx)
 
-                states = [(s, s.state.time + 0.0), (goal_vtx, s.state.time + cost)]
-                actions = [(MAPFTransitAction(Fly), weight)]
-                fmin = cost
+                append!(states, [(s, s.state.time + 0.0), (goal_vtx, s.state.time + elapsed_time(env, s, goal_vtx))])
+                append!(actions, [(MAPFTransitAction(Fly), weight)])
                 env.curr_site_points[agent_idx] = 2
 
             else
 
+                dist = distance_traversed(env, s, goal_vtx)
+                push!(env.valid_path_dists, dist)
+
                 sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
-                cost = costs[end]
-
-                states = [(get_mapf_state_from_idx(env, idx), s.state.time + c) for (idx, c) in zip(sp_idxs, costs)]
-                actions = [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))]
-                fmin = cost
+                append!(states, [(get_mapf_state_from_idx(env, idx), s.state.time + c) for (idx, c) in zip(sp_idxs, costs)])
+                append!(actions, [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))])
 
                 env.curr_site_points[agent_idx] = length(sp_idxs)
             end
@@ -428,12 +428,11 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
             # Copy over previous values
             @debug "Copying over subpart towards of agent $(agent_idx)"
 
-            states = solution[agent_idx].states[1 : env.curr_site_points[agent_idx]]
-            actions = solution[agent_idx].actions[1 : env.curr_site_points[agent_idx] - 1]
-            cost = states[end][2]
-            fmin = cost
-
+            append!(states, solution[agent_idx].states[1 : env.curr_site_points[agent_idx]])
+            append!(actions, solution[agent_idx].actions[1 : env.curr_site_points[agent_idx] - 1])
         end
+
+        first_cost = states[end][2]
 
         # Reset stateful things for next search
         orig_str = string("s-", agent_state.task.site)
@@ -441,6 +440,8 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
         edge_constraints = [env.drone_params.max_distance]
 
     end
+
+
 
     goal_str = string("d-", agent_state.task.dest)
     env.curr_goal_idx = env.depot_sites_to_vtx[goal_str]
@@ -473,24 +474,24 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
             env.any_invalid_path = true
 
-            cost_2 = elapsed_time(env, env.state_graph.vertices[orig_idx], goal_vtx)
             weight = distance_traversed(env, env.state_graph.vertices[orig_idx], goal_vtx)
 
-            append!(states, [(goal_vtx, s.state.time + cost_2)])
+            append!(states, [(goal_vtx, first_cost + elapsed_time(env, env.state_graph.vertices[orig_idx], goal_vtx))])
             append!(actions, [(MAPFTransitAction(Fly),weight)])
 
         else
 
             sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
-            cost_2 = costs[end]
+            if agent_state.site_crossed == false
+                append!(states, [(get_mapf_state_from_idx(env, idx), first_cost + c) for (idx, c) in zip(sp_idxs[2:end], costs[2:end])])
+            else
+                # Append the full post soln
+                append!(states, [(get_mapf_state_from_idx(env, idx), first_cost + c) for (idx, c) in zip(sp_idxs, costs)])
+            end
 
-            append!(states, [(get_mapf_state_from_idx(env, idx), s.state.time + cost + c) for (idx, c) in zip(sp_idxs[2:end], costs[2:end])])
             append!(actions, [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))])
         end
-
-        cost += cost_2
-        fmin += cost_2
 
     else
 
@@ -498,9 +499,10 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
         append!(states, solution[agent_idx].states[env.curr_site_points[agent_idx] + 1 : end])
         append!(actions, solution[agent_idx].actions[env.curr_site_points[agent_idx] : end])
-        cost += states[end][2]
-        fmin += states[end][2]
     end
+
+    cost = states[end][2]
+    fmin = cost
 
     # Update the next finish time of agent
     env.agent_states[agent_idx].next_finish_time = cost
@@ -516,17 +518,19 @@ end
 function update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
                               solution::Vector{PR}) where {PR <: PlanResult}
 
-    @assert time_val < env.agent_states[agent_idx].route_finish_time "Agent $(agent_idx) has already finished at time $(time)!"
+    @assert time_val < env.agent_states[agent_idx].next_finish_time "Agent $(agent_idx) has already finished at time $(time)!"
 
     agt_soln_states = solution[agent_idx].states
     agt_soln_actions = solution[agent_idx].actions
 
     state_idx = 0
+    state_time = Inf
 
     # Iterate over agent_states until first state after time
     for (si, (state, t)) in enumerate(agt_soln_states)
         if t >= time_val
             state_idx = si
+            state_time = t
             break
         end
     end
@@ -547,7 +551,7 @@ function update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx:
 
     env.agent_states[agent_idx].dist_flown = dist_flown
 
-    return agt_soln_states[state_idx][1] # That's the state
+    return agt_soln_states[state_idx][1], state_time # That's the state
 end
 
 
@@ -671,9 +675,9 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
     end
 
 
-    sp_idxs, cost, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+    sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
-    return cost
+    return costs[end]
 end
 
 
@@ -694,4 +698,124 @@ function allocation_cost_fn_wrapper(env::MAPFTransitEnv, weight::Float64, n_depo
     end
 
     return get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
+end
+
+
+## Replanning Heuristics
+
+
+# Get the agent that will finish first
+# Also returns the time at which it finishes
+function get_first_finish(solution::Vector{PR}) where {PR <: PlanResult}
+
+    min_cost = Inf
+    min_idx = 0
+
+    for (i, pr) in enumerate(solution)
+        if pr.cost < min_cost
+            min_idx = i
+            min_cost = pr.cost
+        end
+    end
+
+    return (min_idx, min_cost)
+end
+
+# For single agent replanning, we need the set of all vertex constraints of other
+# agents to ignore as constraints to the replanning agent
+# TODO: How to handle the time issue here? (Just take route vertex indices)
+function get_replan_constraints(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
+                              solution::Vector{PR}) where {PR <: PlanResult}
+
+    avoid_vertex_idxs = Set{Int64}()
+
+    # Iterate over all solutions for agents other than agent_idx and find vertices to avoid
+    for (other_idx, soln) in enumerate(solution)
+
+        if other_idx != agent_idx
+            agt_soln_states = soln.states
+
+            for (si, (state, t)) in enumerate(agt_soln_states)
+                if t >= time_val
+                    push!(avoid_vertex_idxs, state.idx)
+                end
+            end
+        end
+    end
+
+    avoid_vertex_map = Dict(towards=>avoid_vertex_idxs, from=>avoid_vertex_idxs)
+
+    return MAPFTransitConstraints(avoid_vertex_map)
+end
+
+# Get all the info necessary to replan for INDIVIDUAL
+# Returns false if drone has no further task
+# Also returns the planning time
+function replan_individual!(env::MAPFTransitEnv, solution::Vector{PR},
+                            n_depots::Int64, n_sites::Int64,
+                            agent_tours::Vector{Vector{Int64}}, weight::Float64) where {PR <: PlanResult}
+
+    # Get first finishing agent and next task for it
+    replan_idx, time_val = get_first_finish(solution)
+    finished_site = env.agent_states[replan_idx].task.site
+    replan_task = get_next_agent_task(agent_tours[replan_idx], n_depots, n_sites, finished_site)
+
+    if replan_task == nothing
+        @warn "Agent has no next task!"
+        return (false, 0.0)
+    end
+
+    env.agent_states[replan_idx] = AgentState(task=replan_task)
+    new_init_state = env.state_graph.vertices[env.depot_sites_to_vtx[string("d-", replan_task.origin)]]
+    replan_constraints = get_replan_constraints(env, time_val, replan_idx, solution)
+
+    # Just a sham solver to rerun low level search
+    solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = weight)
+    el_time = @elapsed new_pr = MultiAgentPathFinding.low_level_search!(solver, replan_idx, new_init_state, replan_constraints, solution)
+    solution[replan_idx] = new_pr
+
+    return (true, el_time)
+end
+
+
+# Replan collectively! In this we want to update the agent states for all agents
+# and then re-run the solver
+# Returns true if valid, the elapsed time, and the new solution
+function replan_collective!(env::MAPFTransitEnv, solution::Vector{PR},
+                            n_depots::Int64, n_sites::Int64,
+                            agent_tours::Vector{Vector{Int64}}, weight::Float64) where {PR <: PlanResult}
+
+
+    replan_idx, time_val = get_first_finish(solution)
+    finished_site = env.agent_states[replan_idx].task.site
+    replan_task = get_next_agent_task(agent_tours[replan_idx], n_depots, n_sites, finished_site)
+
+    if replan_task == nothing
+        @warn "Agent has no next task!"
+        return (false, 0.0, solution)
+    end
+
+    env.agent_states[replan_idx] = AgentState(task=replan_task)
+
+    true_n_agents = length(agent_tours)
+    new_initial_states = Vector{MAPFTransitVertexState}(undef, true_n_agents)
+
+    for i = 1:true_n_agents
+        if i == replan_idx
+            new_initial_states[i] = env.state_graph.vertices[env.depot_sites_to_vtx[string("d-", replan_task.origin)]]
+            env.plan_ref_times[i] = 0.0
+        else
+            new_state, ref_time = update_agent_states!(env, time_val, i, solution)
+            new_initial_states[i] = new_state
+            env.plan_ref_times[i] = ref_time
+        end
+    end
+    
+    @show env.plan_ref_times
+
+    solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = weight)
+
+    el_time = @elapsed new_solution = search!(solver, new_initial_states)
+
+    return (true, el_time, new_solution)
 end

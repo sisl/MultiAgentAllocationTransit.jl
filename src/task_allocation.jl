@@ -419,3 +419,36 @@ function get_agent_task_set(agent_tours::Vector{Vector{Int64}}, n_depots::Int64,
 
     return agent_tasks
 end
+
+
+# For the given agent tour, get the next task after the finished site
+function get_next_agent_task(agent_tour::Vector{Int64}, n_depots::Int64,
+                            n_sites::Int64, finished_site::Int64)
+
+    idx = 1
+
+    while agent_tour[idx] != n_depots + finished_site # Need to add n_depots here
+        idx += 1
+    end
+
+    # Go to next depot and ensure more is left
+    # SINCE TRIMMED, must be another site
+    if idx > length(agent_tour) - 3
+        return nothing
+    end
+
+    idx = idx + 2
+
+    while idx <= length(agent_tour)-1
+
+        if agent_tour[idx-1] <= n_depots && agent_tour[idx] > n_depots &&
+            agent_tour[idx+1] <= n_depots
+            break
+        end
+        idx = idx+1
+    end
+
+    @assert idx < length(agent_tour) "Didn't find dpd' for site $(n_depots+finished_site) in tour $(agent_tour)"
+
+    return (origin = agent_tour[idx-1], site = agent_tour[idx] - n_depots, dest = agent_tour[idx+1])
+end

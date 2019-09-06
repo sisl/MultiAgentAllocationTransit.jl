@@ -89,7 +89,8 @@ export
     trim_circuit!,
     cut_tours,
     task_allocation,
-    get_agent_task_set
+    get_agent_task_set,
+    get_next_agent_task
 
 # Load Transit Env
 export
@@ -102,7 +103,11 @@ export
 # MAPF Transit
 export
     allocation_cost_fn_wrapper,
-    update_agent_states!
+    update_agent_states!,
+    get_first_finish,
+    get_replan_constraints,
+    replan_individual!,
+    replan_collective!
 
 
 include("types.jl")
