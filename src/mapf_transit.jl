@@ -823,8 +823,8 @@ function set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) wh
 
         # You know start state and site state - get dist
         agt_task = env.agent_states[agent_idx].task
-        start_vtx = env.depot_sites_to_vtx[string("d-", agt_task.origin)]
-        site_vtx = env.depot_sites_to_vtx[string("s-", agt_task.site)]
+        start_vtx = env.state_graph.vertices[env.depot_sites_to_vtx[string("d-", agt_task.origin)]]
+        site_vtx = env.state_graph.vertices[env.depot_sites_to_vtx[string("s-", agt_task.site)]]
         dist = distance_traversed(env, start_vtx, site_vtx)
 
         # Now only update IF valid
