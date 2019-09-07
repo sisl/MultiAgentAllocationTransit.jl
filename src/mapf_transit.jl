@@ -834,8 +834,7 @@ function set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) wh
 
             # Now search for transit options
             transit_opts = 0
-            act_limit = min(length(agent_soln.actions), env.curr_site_points[agent_idx])
-            for (act, _) in agent_soln.actions[1:act_limit-1]
+            for (act, _) in agent_soln.actions
                 if act.action == Board::ActionType
                     transit_opts += 1
                 end
