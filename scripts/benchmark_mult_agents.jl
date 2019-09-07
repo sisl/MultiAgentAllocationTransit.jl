@@ -21,7 +21,7 @@ const out_file = ARGS[6]
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
 const ECBS_WEIGHT = 1.05
-const N_DEPOT_VALS = [3, 5, 10, 15, 20]
+const N_DEPOT_VALS = [5, 10, 15, 20]
 const N_AGENT_VALS = [5, 10, 15, 20, 30, 50, 75, 100, 200] # n_sites = 3 * agents
 # const N_DEPOT_VALS = [5]
 # const N_AGENT_VALS = [10]
