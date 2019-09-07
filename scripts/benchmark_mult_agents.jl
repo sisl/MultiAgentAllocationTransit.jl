@@ -52,6 +52,7 @@ function main()
     conflicts = Int64[]
     max_transit_options = Float64[]
     max_path_dists = Float64[]
+    makespans = Float64[]
 
     # Always ignore the first trial
     for TRIAL = 1:N_TRIALS+1
@@ -114,10 +115,13 @@ function main()
         # Compute env diagnostics
         set_solution_diagnostics!(env, solution)
 
+        msp = minimum([s.cost for s in solution])
+
         push!(search_times, t)
         push!(conflicts, solver.num_global_conflicts)
         push!(max_transit_options, maximum(env.valid_transit_options))
         push!(max_path_dists, maximum(env.valid_path_dists))
+        push!(makespans, msp)
 
     end
 
@@ -125,7 +129,8 @@ function main()
     mapf_results["results"] =   Dict("times" => search_times[2:end],
                                     "conflicts" => conflicts[2:end],
                                     "max_transit_options" => max_transit_options[2:end],
-                                    "max_path_dists" => max_path_dists[2:end])
+                                    "max_path_dists" => max_path_dists[2:end],
+                                    "makespans"=>makespans)
 
     out_file_name = string(out_file_pref,"_",N_DEPOTS,"deps_",N_AGENTS,"_agts.json")
     open(out_file_name, "w") do f
