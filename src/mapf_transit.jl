@@ -822,8 +822,9 @@ function set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) wh
     for (agent_idx, agent_soln) in enumerate(solution)
 
         # You know start state and site state - get dist
-        start_vtx = agent_soln.states[1][1]
-        site_vtx = agent_soln.states[env.curr_site_points[agent_idx]][1]
+        agt_task = env.agent_states[agent_idx].task
+        start_vtx = env.depot_sites_to_vtx[string("d-", agt_task.origin)]
+        site_vtx = env.depot_sites_to_vtx[string("s-", agt_task.site)]
         dist = distance_traversed(env, start_vtx, site_vtx)
 
         # Now only update IF valid
@@ -833,7 +834,8 @@ function set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) wh
 
             # Now search for transit options
             transit_opts = 0
-            for (act, _) in agent_soln.actions[1:env.curr_site_points[agent_idx]-1]
+            act_limit = min(length(agent_soln.actions, env.curr_site_points[agent_idx]))
+            for (act, _) in agent_soln.actions[1:act_limit-1]
                 if act.action == Board::ActionType
                     transit_opts += 1
                 end
