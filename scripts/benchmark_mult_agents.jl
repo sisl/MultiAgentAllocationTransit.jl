@@ -138,7 +138,7 @@ function main()
                                             "avg_transit_options" => avg_transit_options[2:end],
                                             "avg_path_dists" => avg_path_dists[2:end])
 
-            out_file_name = string(out_file_pref,"-",N_DEPOTS,"deps-",N_AGENTS,"-agts.json")
+            out_file_name = string(out_file_pref,"_",N_DEPOTS,"deps_",N_AGENTS,"_agts.json")
             open(out_file_name, "w") do f
                 JSON.print(f, mapf_results, 2)
             end
