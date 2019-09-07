@@ -16,12 +16,12 @@ const stop_coords_file = ARGS[2]
 const trips_file = ARGS[3]
 const drone_params_file = ARGS[4]
 const bb_params_file = ARGS[5]
-const out_file = ARGS[6]
+const out_file_pref = ARGS[6]
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
 const ECBS_WEIGHT = 1.05
-const N_DEPOT_VALS = [5, 10, 15, 20]
+const N_DEPOT_VALS = [5, 10, 20]
 const N_AGENT_VALS = [5, 10, 15, 20, 30, 50, 75, 100, 200] # n_sites = 3 * agents
 # const N_DEPOT_VALS = [5]
 # const N_AGENT_VALS = [10]
@@ -44,16 +44,16 @@ function main()
 
 
     # Setup overall results dict
-    mapf_results = Dict("cap_range"=>TRANSIT_CAP_RANGE, "weight"=>ECBS_WEIGHT, "results"=>Dict())
 
     ## Outer loop - number of depots
     for N_DEPOTS in N_DEPOT_VALS
 
-        # Setup results for that number of depots
-        depot_results = Dict()
-
         # Middle loop - number of agents
         for N_AGENTS in N_AGENT_VALS
+
+            mapf_results = Dict("cap_range"=>TRANSIT_CAP_RANGE, "weight"=>ECBS_WEIGHT,
+                                "depots"=>N_DEPOTS, "agents"=>N_AGENTS)
+
 
             if N_AGENTS < N_DEPOTS || N_AGENTS > N_DEPOTS*10
                 continue
@@ -133,16 +133,16 @@ function main()
             end
 
 
-            depot_results[N_AGENTS] = Dict("times" => search_times[2:end],
+            mapf_results["results"] = Dict("times" => search_times[2:end],
                                             "conflicts" => conflicts[2:end],
                                             "avg_transit_options" => avg_transit_options[2:end],
                                             "avg_path_dists" => avg_path_dists[2:end])
-        end
-        mapf_results["results"][N_DEPOTS] = depot_results
-    end
 
-    open(out_file, "w") do f
-        JSON.print(f, mapf_results, 2)
+            out_file_name = string(out_file_pref,"-",N_DEPOTS,"deps-",N_AGENTS,"-agts.json")
+            open(out_file_name, "w") do f
+                JSON.print(f, mapf_results, 2)
+            end
+        end
     end
 end
 
