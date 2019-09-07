@@ -21,11 +21,11 @@ const out_file_pref = ARGS[6]
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
 const ECBS_WEIGHT = 1.05
-const N_DEPOT_VALS = [5, 10, 20]
-const N_AGENT_VALS = [5, 10, 15, 20, 30, 50, 75, 100, 200] # n_sites = 3 * agents
-# const N_DEPOT_VALS = [5]
-# const N_AGENT_VALS = [10]
-const N_TRIALS = 20
+# const N_DEPOT_VALS = [10, 20]
+# const N_AGENT_VALS = [5, 10, 15, 20, 50, 100, 200] # n_sites = 3 * agents
+const N_DEPOT_VALS = [10]
+const N_AGENT_VALS = [20]
+const N_TRIALS = 5
 
 function main()
 
@@ -55,14 +55,14 @@ function main()
                                 "depots"=>N_DEPOTS, "agents"=>N_AGENTS)
 
 
-            if N_AGENTS < N_DEPOTS || N_AGENTS > N_DEPOTS*10
+            if N_AGENTS <= N_DEPOTS || N_AGENTS > N_DEPOTS*10
                 continue
             end
 
             search_times = Float64[]
             conflicts = Int64[]
-            avg_transit_options = Float64[]
-            avg_path_dists = Float64[]
+            max_transit_options = Float64[]
+            max_path_dists = Float64[]
 
             # Always ignore the first trial
             for TRIAL = 1:N_TRIALS+1
@@ -127,16 +127,16 @@ function main()
 
                 push!(search_times, t)
                 push!(conflicts, solver.num_global_conflicts)
-                push!(avg_transit_options, mean(env.valid_transit_options))
-                push!(avg_path_dists, mean(env.valid_path_dists))
+                push!(max_transit_options, maximum(env.valid_transit_options))
+                push!(max_path_dists, maximum(env.valid_path_dists))
 
             end
 
 
             mapf_results["results"] = Dict("times" => search_times[2:end],
                                             "conflicts" => conflicts[2:end],
-                                            "avg_transit_options" => avg_transit_options[2:end],
-                                            "avg_path_dists" => avg_path_dists[2:end])
+                                            "max_transit_options" => max_transit_options[2:end],
+                                            "max_path_dists" => max_path_dists[2:end])
 
             out_file_name = string(out_file_pref,"_",N_DEPOTS,"deps_",N_AGENTS,"_agts.json")
             open(out_file_name, "w") do f
