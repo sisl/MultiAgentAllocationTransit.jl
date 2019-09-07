@@ -107,7 +107,8 @@ export
     get_first_finish,
     get_replan_constraints,
     replan_individual!,
-    replan_collective!
+    replan_collective!,
+    set_solution_diagnostics!
 
 
 include("types.jl")

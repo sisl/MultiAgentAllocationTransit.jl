@@ -333,7 +333,7 @@ end
 # Run low level search from current state for agent_idx
 # Agent task is obtained from env.agent_states
 # If site is crossed, don't need to care about that
-# TODO: A search from a depot/site is done with time 0, rest done from current time
+# Search is done from the current env reference time (which accounts for rolling horizon)
 function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::Int64,
                                                  s::MAPFTransitVertexState, constraints::MAPFTransitConstraints,
                                                  solution::Vector{PR}) where {PR <: PlanResult}
@@ -407,18 +407,14 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
                 # For debugging, make a direct path with distance
                 weight = distance_traversed(env, s, goal_vtx)
 
-                append!(states, [(s, s.state.time + 0.0), (goal_vtx, s.state.time + elapsed_time(env, s, goal_vtx))])
+                append!(states, [(s, first_cost), (goal_vtx, first_cost + elapsed_time(env, s, goal_vtx))])
                 append!(actions, [(MAPFTransitAction(Fly), weight)])
                 env.curr_site_points[agent_idx] = 2
 
             else
-
-                dist = distance_traversed(env, s, goal_vtx)
-                push!(env.valid_path_dists, dist)
-
                 sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
 
-                append!(states, [(get_mapf_state_from_idx(env, idx), s.state.time + c) for (idx, c) in zip(sp_idxs, costs)])
+                append!(states, [(get_mapf_state_from_idx(env, idx), first_cost + c) for (idx, c) in zip(sp_idxs, costs)])
                 append!(actions, [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))])
 
                 env.curr_site_points[agent_idx] = length(sp_idxs)
@@ -669,9 +665,10 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
                                                                            edge_constr_heuristics,
                                                                            edge_constraints)
 
+    # TODO: Not returning Inf to avoid instability?
     if tgt_entry.v_idx == orig_idx
         @warn "In allocation, edge from $(orig_str) to $(goal_str) is empty!"
-        return Inf
+        return 100000.
     end
 
 
@@ -810,12 +807,38 @@ function replan_collective!(env::MAPFTransitEnv, solution::Vector{PR},
             env.plan_ref_times[i] = ref_time
         end
     end
-    
-    @show env.plan_ref_times
 
     solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = weight)
 
     el_time = @elapsed new_solution = search!(solver, new_initial_states)
 
     return (true, el_time, new_solution)
+end
+
+## Set the number of transit options and valid distances
+function set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) where {PR <: PlanResult}
+
+    # Iterate over solutions and only update if valid
+    for (agent_idx, agent_soln) in enumerate(solution)
+
+        # You know start state and site state - get dist
+        start_vtx = agent_soln.states[1][1]
+        site_vtx = agent_soln.states[env.curr_site_points[agent_idx]][1]
+        dist = distance_traversed(env, start_vtx, site_vtx)
+
+        # Now only update IF valid
+        if dist < env.drone_params.max_distance || env.curr_site_points[agent_idx] > 2
+            # IS VALID
+            push!(env.valid_path_dists, dist)
+
+            # Now search for transit options
+            transit_opts = 0
+            for (act, _) in agent_soln.actions[1:env.curr_site_points[agent_idx]-1]
+                if act.action == Board::ActionType
+                    transit_opts += 1
+                end
+            end
+            push!(env.valid_transit_options, transit_opts)
+        end
+    end
 end

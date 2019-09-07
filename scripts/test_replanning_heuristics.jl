@@ -20,7 +20,7 @@ const out_file = "./data/temp_mult_generic.json"
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (2, 4)
-const ECBS_WEIGHT = 1.3
+const ECBS_WEIGHT = 1.05
 const N_DEPOTS = 3
 
 # Change this one

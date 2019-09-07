@@ -59,7 +59,7 @@ state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 # Set the cost function using the wrapper
 # TODO : Set agent states
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
-                     agent_tasks = AgentTask[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
+                     agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
                      stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
                      trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
@@ -76,8 +76,9 @@ true_n_agents = length(agent_tasks)
 @show true_n_agents
 
 
-env.agent_tasks = agent_tasks
-env.curr_site_points = [0 for _ = 1:true_n_agents]
+env.agent_states = [AgentState(task=agt_task) for agt_task in agent_tasks]
+env.curr_site_points = zeros(Int64, true_n_agents)
+env.plan_ref_times = zeros(true_n_agents)
 
 initial_states = Vector{MAPFTransitVertexState}(undef, true_n_agents)
 for i = 1:true_n_agents
@@ -86,14 +87,15 @@ end
 
 solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = ECBS_WEIGHT)
 
-search!(solver, initial_states)
+solution = search!(solver, initial_states)
 
-env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
-                     agent_tasks = agent_tasks, depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                     stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                     trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
-                     drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                     curr_site_points = [0 for _ = 1:true_n_agents])
-solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = ECBS_WEIGHT)
-
-@elapsed solution = search!(solver, initial_states)
+# env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
+#                      agent_states = agent_states, depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
+#                      stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
+#                      trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
+#
+#                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+#                      curr_site_points = [0 for _ = 1:true_n_agents])
+# solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = ECBS_WEIGHT)
+#
+# @elapsed solution = search!(solver, initial_states)

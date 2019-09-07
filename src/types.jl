@@ -147,7 +147,7 @@ end
     curr_goal_idx::Int64                                    = 0
     plan_ref_times::Vector{Float64}                         = Float64[]
     # Diagnostics
-    num_transit_options::Int64                              = 0
+    valid_transit_options::Vector{Int64}                    = Int64[]
     any_invalid_path::Bool                                  = false
     valid_path_dists::Vector{Float64}                       = Float64[]
 end
