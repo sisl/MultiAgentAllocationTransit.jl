@@ -150,6 +150,8 @@ end
     valid_transit_options::Vector{Int64}                    = Int64[]
     any_invalid_path::Bool                                  = false
     valid_path_dists::Vector{Float64}                       = Float64[]
+    num_global_conflicts::Int64                             = 0
+    threshold_global_conflicts::Int64                       = 10
 end
 
 

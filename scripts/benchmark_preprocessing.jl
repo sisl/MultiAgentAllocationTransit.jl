@@ -17,9 +17,9 @@ const trips_file = ARGS[3]
 const drone_params_file = ARGS[4]
 const out_file = ARGS[5]
 
-const MAX_TRANSIT_CAP = 3
+const TRANSIT_CAP_RANGE = (3,5)
 
-tg = load_transit_graph_latlong(stop_coords_file, trips_file, MAX_TRANSIT_CAP, rng)
+tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
 drone_params = parse_drone_params(drone_params_file)
 
 t = @benchmark transit_graph_preprocessing($tg, distance_lat_lon_euclidean, $drone_params)

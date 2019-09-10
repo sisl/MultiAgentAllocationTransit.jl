@@ -8,7 +8,12 @@ using JSON
 using Logging
 global_logger(SimpleLogger(stderr, Logging.Error))
 
-rng = MersenneTwister(2345)
+# julia scripts/benchmark_mult_agents.jl data/sfmta/sf_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_bb_params.toml data/sf_mapf_20trials 5 50 6
+
+# julia scripts/benchmark_mult_agents.jl data/wmata/wdc_params.toml data/wmata/stop_to_coords.json data/wmata/trips.json data/drone_params.toml data/wmata/wdc_params.toml data/wdc_mapf_20trials 5 10 20
+
+
+rng = MersenneTwister(6789)
 
 # Script arguments relating to transit files etc.
 const city_params_file = ARGS[1]
@@ -19,6 +24,7 @@ const bb_params_file = ARGS[5]
 const out_file_pref = ARGS[6]
 const N_DEPOTS = parse(Int64, ARGS[7])
 const N_AGENTS = parse(Int64, ARGS[8])
+const N_TRIALS = parse(Int64, ARGS[9])
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
@@ -27,7 +33,7 @@ const ECBS_WEIGHT = 1.05
 # const N_AGENT_VALS = [5, 10, 15, 20, 50, 100, 200] # n_sites = 3 * agents
 # const N_DEPOT_VALS = [10]
 # const N_AGENT_VALS = [20]
-const N_TRIALS = 5
+# const N_TRIALS = 20
 
 function main()
 
@@ -55,7 +61,8 @@ function main()
     makespans = Float64[]
 
     # Always ignore the first trial
-    for TRIAL = 1:N_TRIALS+1
+    TRIAL = 1
+    while TRIAL <= N_TRIALS+1
 
         # Inner loop - number of trials
         N_SITES = 2 * N_AGENTS
@@ -83,10 +90,10 @@ function main()
                              drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                              curr_site_points = [])
 
+        # run the task allocation, obtain the agent tasks and true number of agents
         cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
 
 
-        # run the task allocation, obtain the agent tasks and true number of agents
         agent_tours = task_allocation(N_DEPOTS, N_SITES, N_AGENTS,
                                       depot_sites, cost_fn)
 
@@ -109,20 +116,35 @@ function main()
         solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = ECBS_WEIGHT)
 
 
-        t = @elapsed solution = search!(solver, initial_states)
+        # Put try-catch for global errors
+        try
+            t = @elapsed solution = search!(solver, initial_states)
+        catch e
+            if isa(e, DomainError)
+                println("More than $(env.threshold_global_conflicts) conflicts; exiting!")
+            end
+            continue
+        end
+
         println("$t seconds; $(solver.num_global_conflicts) conflicts")
 
         # Compute env diagnostics
         set_solution_diagnostics!(env, solution)
 
-        msp = minimum([s.cost for s in solution])
+        n_valid_firstpaths = length(env.valid_path_dists)
 
-        push!(search_times, t)
-        push!(conflicts, solver.num_global_conflicts)
-        push!(max_transit_options, maximum(env.valid_transit_options))
-        push!(max_path_dists, maximum(env.valid_path_dists))
-        push!(makespans, msp)
+        if n_valid_firstpaths > 0.67 * true_n_agents
 
+            msp = maximum([s.cost for s in solution])
+
+            push!(search_times, t)
+            push!(conflicts, solver.num_global_conflicts)
+            push!(max_transit_options, maximum(env.valid_transit_options))
+            push!(max_path_dists, maximum(env.valid_path_dists))
+            push!(makespans, msp)
+
+            TRIAL = TRIAL + 1
+        end
     end
 
 

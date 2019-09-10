@@ -386,11 +386,18 @@ function task_allocation(n_depots::Int64, n_sites::Int64, n_agents, depot_sites:
     agent_tours = cut_tours(circuit, n_depots, n_agents, depot_sites, cost_fn)
 
     # Trim the agent sub-tours also
+    empty_tours = Int64[]
     for (i, atour) in enumerate(agent_tours)
         if ~(isempty(atour))
             trim_circuit!(agent_tours[i], n_depots)
         end
+        if isempty(agent_tours[i])
+            push!(empty_tours, i)
+        end
     end
+
+    # delete empty agent tours
+    deleteat!(agent_tours, empty_tours)
 
     return agent_tours
 

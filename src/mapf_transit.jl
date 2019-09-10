@@ -155,6 +155,12 @@ end
 
 function MultiAgentPathFinding.create_constraints_from_conflict(env::MAPFTransitEnv, conflict::MAPFTransitConflict)
 
+    # Increment the number of global conflicts and throw error if above threshold
+    env.num_global_conflicts += 1
+    if env.num_global_conflicts > env.threshold_global_conflicts
+        throw(DomainError("Too many conflicts!"))
+    end
+
     # Do for each type of conflict
     if conflict.type ==  Transfer::ConflictType
 
@@ -532,7 +538,14 @@ function update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx:
     end
 
     # Now deal with state_idx
-    @assert state_idx < length(agt_soln_states) "Agent $(agent_idx) has inconsistent time trajectory!"
+    @assert state_idx <= length(agt_soln_states) "Agent $(agent_idx) has inconsistent time trajectory!; $(time_val); $(agt_soln_states)"
+
+    # TODO: hack to avoid pathological case of agent being at end of solution
+    if state_idx == length(agt_soln_states)
+        state_idx = state_idx - 1
+        state_time = agt_soln_states[state_idx][2]
+    end
+
 
     dist_start_idx = 1
     if state_idx >= env.curr_site_points[agent_idx]

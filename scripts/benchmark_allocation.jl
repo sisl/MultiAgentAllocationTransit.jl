@@ -8,23 +8,20 @@ using JSON
 
 rng = MersenneTwister(2345)
 
-params_file = ARGS[1]
+const params_file = ARGS[1]
 city_params = parse_city_params(params_file)
 
-out_file = ARGS[2]
+const out_file_pref = ARGS[2]
 
 lat_dist = Uniform(city_params.lat_start, city_params.lat_end)
 lon_dist = Uniform(city_params.lon_start, city_params.lon_end)
 
-# Fixing N_depots and N_agents = N_depots
-const N_DEPOTS = 10
+# N_agents = N_depots
+const N_DEPOTS = parse(Int64, ARGS[3])
 const depots = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_DEPOTS]
 const N_AGENTS = N_DEPOTS
 
-allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_stats"=>Dict())
-
-
-const N_SITE_VALS = [20, 30, 40, 50, 100, 200, 500]
+const N_SITE_VALS = [20, 50, 100, 200, 500, 1000, 5000]
 
 for N_SITES in N_SITE_VALS
 
@@ -42,13 +39,14 @@ for N_SITES in N_SITE_VALS
     @show N_SITES
     @show mean(t.times)
 
+    allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_stats"=>Dict())
     allocation_results["site_stats"][N_SITES] = Dict("mean" => mean(t.times),
                                                      "median" => median(t.times),
                                                      "std" => std(t.times),
                                                      "samples" => t.params.samples)
 
-end
-
-open(out_file, "w") do f
-    JSON.print(f, allocation_results, 2)
+    out_file = string(out_file_pref,"_",N_SITES,"sites.json")
+    open(out_file, "w") do f
+        JSON.print(f, allocation_results, 2)
+    end
 end
