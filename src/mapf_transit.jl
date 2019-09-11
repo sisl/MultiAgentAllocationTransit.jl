@@ -275,6 +275,7 @@ function distance_heuristic(env::MAPFTransitEnv, nn_dist::Float64, nn_stop::Int6
 
         return nn_dist + min_trip_to_trip
     else
+        # TODO: Keeping 0 for simplicity, as depot/site always popped. Change later
         return 0.0
     end
 end
@@ -691,7 +692,7 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
 end
 
 
-function allocation_cost_fn_wrapper(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
+function allocation_cost_wrapper_truett(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
                                     orig_ds_idx::Int64, goal_ds_idx::Int64)
 
     # Compute the origin and goal strings
@@ -708,6 +709,28 @@ function allocation_cost_fn_wrapper(env::MAPFTransitEnv, weight::Float64, n_depo
     end
 
     return get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
+end
+
+function allocation_cost_wrapper_estimate(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
+                                          halton_nn_tree::BallTree, estimate_matrix::Matrix{Float64},
+                                          orig_ds_idx::Int64, goal_ds_idx::Int64)
+
+    # Compute the origin and goal strings
+    if orig_ds_idx > n_depots
+        orig_str = string("s-", (orig_ds_idx - n_depots))
+    else
+        orig_str = string("d-", orig_ds_idx)
+    end
+    loc1 = env.state_graph.vertices[env.depot_sites_to_vtx[orig_str]].state.location
+
+    if goal_ds_idx > n_depots
+        goal_str = string("s-", (goal_ds_idx - n_depots))
+    else
+        goal_str = string("d-", goal_ds_idx)
+    end
+    loc2 = env.state_graph.vertices[env.depot_sites_to_vtx[goal_str]].state.location
+
+    return get_travel_time_estimate(halton_nn_tree, loc1, loc2, estimate_matrix)
 end
 
 

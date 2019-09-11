@@ -173,9 +173,40 @@ struct EuclideanLatLong <: Metric
 end
 
 function Distances.evaluate(::EuclideanLatLong,
-                            x::Union{SVector{2,Float64}, MVector{2,Float64}},
-                            y::Union{SVector{2,Float64}, MVector{2,Float64}})
+                            x::AbstractVector{Float64},
+                            y::AbstractVector{Float64})
     coords1 = (lat=x[1], lon=x[2])
     coords2 = (lat=y[1], lon=y[2])
     return distance_lat_lon_euclidean(coords1, coords2)
+end
+
+
+## Halton sequence for space coverage
+function get_halton_value(index::Int64, base::Int64)
+
+    res = 0
+    f = 1
+
+    while index > 0
+        f = f*1.0/base
+        res += f*(index%base)
+        index = div(index, base)
+    end
+
+    return res
+end
+
+
+function get_halton_sequence(n::Int64, bases::Vector{Int64}, lower::Vector{Float64}, upper::Vector{Float64},
+                             discard::Int64)
+
+    @assert length(bases) == length(lower) && length(lower) == length(upper)
+
+    ndims = length(bases)
+    diff = upper - lower
+    grid_points = [SVector{ndims,Float64}([get_halton_value(idx, b) for b in bases])  for idx = 1:n+discard]
+
+    grid_scaled_points = [SVector{ndims,Float64}(lower + gp.*diff) for gp in grid_points]
+
+    return grid_scaled_points
 end

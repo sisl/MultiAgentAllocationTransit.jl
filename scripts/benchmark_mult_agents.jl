@@ -6,9 +6,12 @@ using BenchmarkTools
 using Statistics
 using JSON
 using Logging
+using JLD2
+using NearestNeighbors
+using StaticArrays
 global_logger(SimpleLogger(stderr, Logging.Error))
 
-# julia scripts/benchmark_mult_agents.jl data/sfmta/sf_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_bb_params.toml data/sf_mapf_20trials 5 50 6
+# julia scripts/benchmark_mult_agents.jl data/sfmta/sf_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_bb_params.toml data/sf_mapf_20trials data/sfmta/sf_halton_tt_estimates.jld2 5 10 20
 
 # julia scripts/benchmark_mult_agents.jl data/wmata/wdc_params.toml data/wmata/stop_to_coords.json data/wmata/trips.json data/drone_params.toml data/wmata/wdc_params.toml data/wdc_mapf_20trials 5 10 20
 
@@ -22,9 +25,10 @@ const trips_file = ARGS[3]
 const drone_params_file = ARGS[4]
 const bb_params_file = ARGS[5]
 const out_file_pref = ARGS[6]
-const N_DEPOTS = parse(Int64, ARGS[7])
-const N_AGENTS = parse(Int64, ARGS[8])
-const N_TRIALS = parse(Int64, ARGS[9])
+const city_travel_time_estimates = ARGS[7]
+const N_DEPOTS = parse(Int64, ARGS[8])
+const N_AGENTS = parse(Int64, ARGS[9])
+const N_TRIALS = parse(Int64, ARGS[10])
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
@@ -49,6 +53,10 @@ function main()
     tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
     tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
                     transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
+
+
+    # Load halton stuff
+    @load city_travel_time_estimates halton_nn_tree city_halton_points travel_time_estimates
 
 
     mapf_results = Dict("cap_range"=>TRANSIT_CAP_RANGE, "weight"=>ECBS_WEIGHT,
@@ -88,11 +96,12 @@ function main()
                              stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
                              trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
                              drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                             curr_site_points = [])
+                             curr_site_points = [], threshold_global_conflicts = 8)
 
         # run the task allocation, obtain the agent tasks and true number of agents
-        cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
-
+        # cost_fn(i, j) = allocation_cost_fn_wrapper_truett(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
+        cost_fn(i, j) = allocation_cost_wrapper_estimate(env, ECBS_WEIGHT, N_DEPOTS, N_SITES,
+                                                        halton_nn_tree, travel_time_estimates, i, j)
 
         agent_tours = task_allocation(N_DEPOTS, N_SITES, N_AGENTS,
                                       depot_sites, cost_fn)
@@ -117,6 +126,8 @@ function main()
 
 
         # Put try-catch for global errors
+        t = 0.0
+        solution = PlanResult{MAPFTransitVertexState,MAPFTransitAction,Float64}[]
         try
             t = @elapsed solution = search!(solver, initial_states)
         catch e

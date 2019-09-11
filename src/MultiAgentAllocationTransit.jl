@@ -63,7 +63,8 @@ export
     stop_locations_nearest_neighbors,
     trip_meta_graph_fws_dists,
     get_stop_idx_to_trip_ids,
-    get_non_dominated_trip_points
+    get_non_dominated_trip_points,
+    get_halton_sequence
 
 # GTFS Parser
 export
@@ -78,7 +79,10 @@ export
     get_stop_idx_to_trip_ids,
     generate_depot_to_sites_dists,
     true_stop_to_locations,
-    transit_graph_preprocessing
+    transit_graph_preprocessing,
+    generate_city_halton_nn,
+    get_travel_time_estimate,
+    compute_all_pairs_estimates
 
 # Task Allocation
 export
@@ -103,12 +107,14 @@ export
 # MAPF Transit
 export
     allocation_cost_fn_wrapper,
+    allocation_cost_wrapper_estimate,
     update_agent_states!,
     get_first_finish,
     get_replan_constraints,
     replan_individual!,
     replan_collective!,
-    set_solution_diagnostics!
+    set_solution_diagnostics!,
+    get_depot_to_site_travel_time
 
 
 include("types.jl")

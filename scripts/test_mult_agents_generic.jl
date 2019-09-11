@@ -6,24 +6,27 @@ using BenchmarkTools
 using Statistics
 using JSON
 using Logging
+using JLD2
+using NearestNeighbors
+using StaticArrays
 # global_logger(SimpleLogger(stderr, Logging.Warn))
 
-rng = MersenneTwister(2345)
+rng = MersenneTwister(6789)
 
-# Script arguments relating to transit files etc.
-# const city_params_file = "./data/sfmta/sf_params.toml"
-# const stop_coords_file = "./data/sfmta/stop_to_coords.json"
-# const trips_file = "./data/sfmta/trips.json"
-# const drone_params_file = "./data/drone_params.toml"
-# const bb_params_file = "./data/sfmta/sf_bb_params.toml"
-# const out_file = "./data/temp_mult_generic.json"
-
-const city_params_file = "./data/wmata/wdc_params.toml"
-const bb_params_file = "./data/wmata/wdc_params.toml"
-const stop_coords_file = "./data/wmata/stop_to_coords.json"
-const trips_file = "./data/wmata/trips.json"
+const city_params_file = "./data/sfmta/sf_params.toml"
+const stop_coords_file = "./data/sfmta/stop_to_coords.json"
+const trips_file = "./data/sfmta/trips.json"
 const drone_params_file = "./data/drone_params.toml"
+const bb_params_file = "./data/sfmta/sf_bb_params.toml"
+const city_travel_time_estimates = "./data/sfmta/sf_halton_tt_estimates.jld2"
 const out_file = "./data/temp_mult_generic.json"
+
+# const city_params_file = "./data/wmata/wdc_params.toml"
+# const bb_params_file = "./data/wmata/wdc_params.toml"
+# const stop_coords_file = "./data/wmata/stop_to_coords.json"
+# const trips_file = "./data/wmata/trips.json"
+# const drone_params_file = "./data/drone_params.toml"
+# const out_file = "./data/temp_mult_generic.json"
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
@@ -31,17 +34,17 @@ const ECBS_WEIGHT = 1.05
 
 ## Hard-code a bunch of depots and many more sites
 # SF DEPOTS
-# const DEPOT1 = LatLonCoords((lat = 37.762892, lon = -122.472193))
-# const DEPOT2 = LatLonCoords((lat = 37.751751, lon = -122.410654))
-# const DEPOT3 = LatLonCoords((lat = 37.718779, lon = -122.462401))
-# depots = [DEPOT1, DEPOT2, DEPOT3]
+const DEPOT1 = LatLonCoords((lat = 37.762892, lon = -122.472193))
+const DEPOT2 = LatLonCoords((lat = 37.751751, lon = -122.410654))
+const DEPOT3 = LatLonCoords((lat = 37.718779, lon = -122.462401))
+depots = [DEPOT1, DEPOT2, DEPOT3]
 
 # WDC DEPOTS
-const DEPOT1 = LatLonCoords((lat = 38.873413, lon = -77.183164))
-const DEPOT2 = LatLonCoords((lat = 38.891249, lon = -76.934652))
-const DEPOT3 = LatLonCoords((lat = 38.975575, lon = -77.030623))
-const DEPOT4 = LatLonCoords((lat = 38.796760, lon = -76.976235))
-depots = [DEPOT1, DEPOT2, DEPOT3, DEPOT4]
+# const DEPOT1 = LatLonCoords((lat = 38.873413, lon = -77.183164))
+# const DEPOT2 = LatLonCoords((lat = 38.891249, lon = -76.934652))
+# const DEPOT3 = LatLonCoords((lat = 38.975575, lon = -77.030623))
+# const DEPOT4 = LatLonCoords((lat = 38.796760, lon = -76.976235))
+# depots = [DEPOT1, DEPOT2, DEPOT3, DEPOT4]
 
 const N_DEPOTS = length(depots)
 # Change this one
@@ -61,6 +64,8 @@ tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE,
 tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
                 transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
+@load city_travel_time_estimates halton_nn_tree city_halton_points travel_time_estimates
+
 sites = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_SITES]
 depot_sites = vcat(depots, sites)
 
@@ -72,7 +77,6 @@ state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 
 
 # Set the cost function using the wrapper
-# TODO : Set agent states
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                      agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
                      stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
@@ -81,7 +85,9 @@ env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = 
                      curr_site_points = [])
 
 # cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
-cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
+# cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
+cost_fn(i, j) = allocation_cost_wrapper_estimate(env, ECBS_WEIGHT, N_DEPOTS, N_SITES,
+                                                halton_nn_tree, travel_time_estimates, i, j)
 
 agent_tours = task_allocation(N_DEPOTS, N_SITES, N_AGENTS,
                               depot_sites, cost_fn)

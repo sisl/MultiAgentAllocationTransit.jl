@@ -148,3 +148,58 @@ function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, s
     return depot_to_sites_dists
 
 end
+
+# Generate a NN tree over halton points and the index of points
+function generate_city_halton_nn(city_params::CityParams; n_points::Int64 = 100,
+                                 bases::Vector{Int64} = [2, 3], discard::Int64 = 0)
+
+    lower = [city_params.lat_start, city_params.lon_start]
+    upper = [city_params.lat_end, city_params.lon_end]
+
+    # Generate the halton sequence
+    city_halton_points = get_halton_sequence(n_points, bases, lower, upper, discard)
+
+    # Generate the NN tree
+    # nn_tree.data has the map from idx to point
+    halton_nn_tree = BallTree(city_halton_points, EuclideanLatLong())
+
+    return halton_nn_tree, city_halton_points
+end
+
+
+function get_travel_time_estimate(halton_nn_tree::BallTree, loc1::LOC, loc2::LOC,
+                                  estimate_matrix::Matrix{Float64}) where LOC
+
+    # Get the nearest neighbor for each location
+    # IMP - If they are the same, return 0.0
+    loc1_vect = convert_to_vector(loc1)
+    loc1_idxs, _ = knn(halton_nn_tree, loc1_vect, 1)
+    loc1_idx = loc1_idxs[1]
+
+    loc2_vect = convert_to_vector(loc2)
+    loc2_idxs, _ = knn(halton_nn_tree, loc2_vect, 1)
+    loc2_idx = loc2_idxs[1]
+
+    # Returns 0.0 if same!
+    return estimate_matrix[loc1_idx, loc2_idx]
+end
+
+function compute_all_pairs_estimates(env::MAPFTransitEnv, n_halton_points::Int64, weight::Float64)
+
+    travel_time_estimates = zeros(n_halton_points, n_halton_points)
+
+    for i = 1:n_halton_points
+        println("From point $i:")
+        for j = 1:n_halton_points
+
+            if i != j
+                orig_str = string("d-", i)
+                goal_str = string("d-", j)
+
+                travel_time_estimates[i, j] = get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
+            end
+        end
+    end
+
+    return travel_time_estimates
+end
