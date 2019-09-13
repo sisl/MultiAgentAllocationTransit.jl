@@ -730,6 +730,12 @@ function allocation_cost_wrapper_estimate(env::MAPFTransitEnv, weight::Float64, 
     end
     loc2 = env.state_graph.vertices[env.depot_sites_to_vtx[goal_str]].state.location
 
+    tt = get_travel_time_estimate(halton_nn_tree, loc1, loc2, estimate_matrix)
+
+    # if tt == 0. || tt == 100000.
+    #     tt = env.dist_fn(loc1, loc2) / env.drone_params.
+    # end
+
     return get_travel_time_estimate(halton_nn_tree, loc1, loc2, estimate_matrix)
 end
 

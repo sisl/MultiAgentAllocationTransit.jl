@@ -83,7 +83,7 @@ function main()
                              stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
                              trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
                              drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                             curr_site_points = [], threshold_global_conflicts = 10)
+                             curr_site_points = [], threshold_global_conflicts = 5)
 
         # run the task allocation, obtain the agent tasks and true number of agents
         cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
