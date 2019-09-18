@@ -1,19 +1,54 @@
-## Takes in a transit graph
-## Computes the minimum flight distance between each pair of trips
-## Then runs FWS on the Time-Invariant Meta Route graph
-function trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
-                                   drone_params::DroneParams) where {TG <: TransitGraph}
+## Create augmented trip metagraph with trip vertices AND depot-sites
+## Then run FWS on them to get min flight distance
+## Index: 1....n_depots....n_depots+n_sites.....n_deps+n_sites+n_trips
+function augmented_trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
+                                             n_depots::Int64, n_sites::Int64,
+                                             depot_sites::Vector{LOC}, drone_params::DroneParams) where {LOC, TG <: TransitGraph}
 
     n_trips = length(tg.transit_trips)
+    n_verts = n_depots + n_sites + n_trips
 
-    # Create the Floyd-Warshall dists matrix
-    dists = zeros(n_trips, n_trips)
+    # Create the FWS dists matrix
+    fws_dists = Inf*ones(n_verts, n_verts)
 
-    # Compute the min traversal distance between trips
-    for i = 1:n_trips
-        trip1 = tg.transit_trips[i]
-        for j = 1:n_trips
-            trip2 = tg.transit_trips[j]
+    # First do depots-sites
+    for i = 1:n_depots + n_sites
+        for j = 1:n_depots + n_sites
+
+            if i != j
+                dist = dist_fn(depot_sites[i], depot_sites[j])
+                if dist < drone_params.max_distance
+                    fws_dists[i, j] = dist
+                    fws_dists[j, i] = dist
+                end
+            end
+        end
+    end
+
+    # Now do depot-sites to trips
+    for i = 1:n_depots + n_sites
+        for j = n_depots+n_sites+1:n_verts
+            trip = tg.transit_trips[j - n_depots - n_sites]
+            mindist = Inf
+
+            for rwp in trip
+
+                dist = dist_fn(depot_sites[i], tg.stop_to_location[rwp.stop_id])
+                mindist = (dist < mindist) ? dist : mindist
+
+            end
+
+            fws_dists[i, j] = mindist
+            fws_dists[j, i] = mindist
+        end
+    end
+
+
+    # Finally, do trip-trip
+    for i = n_depots + n_sites + 1:n_verts
+        trip1 = tg.transit_trips[i - n_depots - n_sites]
+        for j = n_depots + n_sites + 1:n_verts
+            trip2 = tg.transit_trips[j - n_depots - n_sites]
             mindist = Inf
 
             # Iterate over both trips and compute min distance
@@ -28,15 +63,19 @@ function trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
                 end
             end
 
-            dists[i, j] = mindist
+            fws_dists[i, j] = mindist
+
         end
     end
 
-    floyd_warshall!(dists)
 
-    return dists
+    # Run FWS to get distances
+    floyd_warshall!(fws_dists)
 
+    return fws_dists
 end
+
+
 
 
 ## Creates a nearest neighbor tree with stop locations

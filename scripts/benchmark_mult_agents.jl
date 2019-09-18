@@ -33,11 +33,6 @@ const N_TRIALS = parse(Int64, ARGS[10])
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
 const ECBS_WEIGHT = 1.05
-# const N_DEPOT_VALS = [10, 20]
-# const N_AGENT_VALS = [5, 10, 15, 20, 50, 100, 200] # n_sites = 3 * agents
-# const N_DEPOT_VALS = [10]
-# const N_AGENT_VALS = [20]
-# const N_TRIALS = 20
 
 function main()
 
@@ -51,8 +46,7 @@ function main()
 
     # Transit Graph Preprocessing
     tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
-    tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
-                    transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
+    tg, stop_idx_to_trips = transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
 
     # Load halton stuff
@@ -84,8 +78,12 @@ function main()
 
         # Off transit preprocessing
         otg = OffTransitGraph(depots = depots, sites = sites)
-        depot_to_sites_dists = generate_depot_to_sites_dists(otg, tg, stops_nn_tree, nn_idx_to_stop, stop_idx_to_trips,
-                                    trips_fws_dists, MultiAgentAllocationTransit.distance_lat_lon_euclidean)
+
+        trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+                                                              length(depots), length(sites),
+                                                              vcat(depots, sites),
+                                                              drone_params)
+
         state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 
 
@@ -93,10 +91,9 @@ function main()
         # Set up the shadow env to do task allocation with
         env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                              agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                             stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                             trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
+                             stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
                              drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                             curr_site_points = [], threshold_global_conflicts = 5)
+                             curr_site_points = [], threshold_global_conflicts = 10)
 
         # run the task allocation, obtain the agent tasks and true number of agents
         # cost_fn(i, j) = allocation_cost_fn_wrapper_truett(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
@@ -144,7 +141,7 @@ function main()
 
         n_valid_firstpaths = length(env.valid_path_dists)
 
-        if n_valid_firstpaths > 0.5 * true_n_agents
+        if n_valid_firstpaths > 0.67 * true_n_agents
 
             msp = maximum([s.cost for s in solution])
 

@@ -125,7 +125,8 @@ end
 
 
 # Take the TG from load_transit_graph_LOC
-function transit_graph_preprocessing(tg::TransitGraph, dist_fn::F, drone_params::DroneParams) where {F <: Function}
+function transit_graph_preprocessing(tg::TransitGraph, dist_fn::F,
+                                     drone_params::DroneParams) where {F <: Function}
 
     stop_idx_to_trips = get_stop_idx_to_trip_ids(tg)
 
@@ -133,10 +134,6 @@ function transit_graph_preprocessing(tg::TransitGraph, dist_fn::F, drone_params:
 
     post_tg = TransitGraph(true_stop_to_locs, tg.transit_trips, tg.transit_capacity)
 
-    trips_fws_dists = trip_meta_graph_fws_dists(post_tg, dist_fn, drone_params)
-
-    stops_nn_tree, nn_idx_to_stop = stop_locations_nearest_neighbors(post_tg.stop_to_location, EuclideanLatLong())
-
-    return post_tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop
+    return post_tg, stop_idx_to_trips
 
 end
