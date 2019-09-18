@@ -144,7 +144,7 @@ function main()
 
         n_valid_firstpaths = length(env.valid_path_dists)
 
-        if n_valid_firstpaths > 0.67 * true_n_agents
+        if n_valid_firstpaths > 0.5 * true_n_agents
 
             msp = maximum([s.cost for s in solution])
 

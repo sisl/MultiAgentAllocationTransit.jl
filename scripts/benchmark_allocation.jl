@@ -21,7 +21,7 @@ const N_DEPOTS = parse(Int64, ARGS[3])
 const depots = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_DEPOTS]
 const N_AGENTS = N_DEPOTS
 
-const N_SITE_VALS = [20, 50, 100, 200, 500, 1000, 5000]
+const N_SITE_VALS = [50, 100, 200, 500, 1000, 5000]
 
 for N_SITES in N_SITE_VALS
 
@@ -30,8 +30,7 @@ for N_SITES in N_SITE_VALS
     depot_sites = vcat(depots, sites)
     cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
 
-    b = @benchmarkable task_allocation($N_DEPOTS, $N_SITES, $N_AGENTS,
-        depot_sites, $cost_fn)  setup=(depot_sites = vcat($depots, [LatLonCoords((lat = rand($rng, $lat_dist), lon = rand($rng, $lon_dist))) for i = 1:$N_SITES]))
+    b = @benchmarkable task_allocation($N_DEPOTS, $N_SITES, $N_AGENTS, $depot_sites, $cost_fn) 
 
     t = run(b) # Do once to trigger...something
     t = run(b)
