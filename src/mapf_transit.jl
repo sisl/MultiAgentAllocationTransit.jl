@@ -392,7 +392,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
         if isempty(solution) || ~(isempty(constraints.avoid_vertex_map[towards]))
 
             vis = MAPFTransitGoalVisitor(env, constraints.avoid_vertex_map[towards])
-            astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+            astar_eps_states, tgt_entry = a_star_implicit_constrained_epsilon_path!(env.state_graph,
                                                                                    edge_wt_fn,
                                                                                    orig_idx, vis, solver.weight,
                                                                                    admissible_heuristic,
@@ -416,7 +416,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
                 env.curr_site_points[agent_idx] = 2
 
             else
-                sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+                sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states.a_star_states, env.state_graph, orig_idx, tgt_entry)
 
                 append!(states, [(get_mapf_state_from_idx(env, idx), first_cost + c) for (idx, c) in zip(sp_idxs, costs)])
                 append!(actions, [(get_mapf_action(env, u, v), wts[i+1][1] - wts[i][1]) for (i, (u, v)) in enumerate(zip(sp_idxs[1:end-1], sp_idxs[2:end]))])
@@ -449,7 +449,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     if isempty(solution) || ~(isempty(constraints.avoid_vertex_map[from]))
 
         vis = MAPFTransitGoalVisitor(env, constraints.avoid_vertex_map[from])
-        astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+        astar_eps_states, tgt_entry = a_star_implicit_constrained_epsilon_path!(env.state_graph,
                                                                                edge_wt_fn,
                                                                                orig_idx, vis, solver.weight,
                                                                                admissible_heuristic,
@@ -472,7 +472,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
 
         else
 
-            sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+            sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states.a_star_states, env.state_graph, orig_idx, tgt_entry)
 
             if agent_state.site_crossed == false
                 append!(states, [(get_mapf_state_from_idx(env, idx), first_cost + c) for (idx, c) in zip(sp_idxs[2:end], costs[2:end])])
@@ -674,7 +674,7 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
     end
 
 
-    sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states, env.state_graph, orig_idx, tgt_entry)
+    sp_idxs, costs, wts = shortest_path_cost_weights(astar_eps_states.a_star_states, env.state_graph, orig_idx, tgt_entry)
 
     return costs[end]
 end
