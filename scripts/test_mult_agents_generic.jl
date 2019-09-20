@@ -48,8 +48,8 @@ depots = [DEPOT1, DEPOT2, DEPOT3]
 
 const N_DEPOTS = length(depots)
 # Change this one
-const N_AGENTS = 10
-const N_SITES = 2*N_AGENTS
+const N_AGENTS = 100
+const N_SITES = 3*N_AGENTS
 
 
 city_params = parse_city_params(city_params_file)
@@ -80,7 +80,7 @@ state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 # Set the cost function using the wrapper
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                      agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                     stops_nn_tree = stops_nn_tree, trips_fws_dists = trips_fws_dists,
+                     stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                      curr_site_points = [])
 

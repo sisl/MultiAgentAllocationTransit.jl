@@ -29,6 +29,9 @@ using TOML
 using Graphs
 using MultiAgentPathFinding
 
+# for plotting
+using Plots
+
 # Types
 export
     Location2D,
@@ -64,7 +67,9 @@ export
     trip_meta_graph_fws_dists,
     get_stop_idx_to_trip_ids,
     get_non_dominated_trip_points,
-    get_halton_sequence
+    get_halton_sequence,
+    plot_depots_sites!,
+    render_drones
 
 # GTFS Parser
 export
