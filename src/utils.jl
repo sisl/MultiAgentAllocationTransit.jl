@@ -286,7 +286,7 @@ function render_drones(background::Plots.Plot, side_x::Int64, side_y::Int64, bb_
             pre_str = agt_soln_states[pre_state_idx][1].vertex_str
             post_str = agt_soln_states[post_state_idx][1].vertex_str
 
-            if startswith(pre_str, "r") && startswith(pre_str, "r")
+            if startswith(pre_str, "r") && startswith(post_str, "r")
                 dr_color = :red
             else
                 dr_color = :blue

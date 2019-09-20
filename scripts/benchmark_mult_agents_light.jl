@@ -23,7 +23,7 @@ const N_TRIALS = parse(Int64, ARGS[9])
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
-const ECBS_WEIGHT = 1.05
+const ECBS_WEIGHT = 1.1
 
 function main()
 

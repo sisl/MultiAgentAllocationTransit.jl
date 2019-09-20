@@ -26,7 +26,7 @@ const N_AGENTS = parse(Int64, ARGS[9])
 const N_TRIALS = parse(Int64, ARGS[10])
 
 const TRANSIT_CAP_RANGE = (3, 5)
-const ECBS_WEIGHT = 1.05
+const ECBS_WEIGHT = 1.1
 
 # julia scripts/benchmark_replanning.jl data/sfmta/sf_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_bb_params.toml data/sf_replan_20trials data/sfmta/sf_halton_tt_estimates.jld2 5 10 20
 

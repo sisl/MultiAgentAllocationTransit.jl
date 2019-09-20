@@ -9,46 +9,49 @@ using Logging
 using JLD2
 using NearestNeighbors
 using StaticArrays
-# global_logger(SimpleLogger(stderr, Logging.Warn))
+global_logger(SimpleLogger(stderr, Logging.Error))
 
 rng = MersenneTwister(6789)
 
-const city_params_file = "./data/sfmta/sf_params.toml"
-const stop_coords_file = "./data/sfmta/stop_to_coords.json"
-const trips_file = "./data/sfmta/trips.json"
-const drone_params_file = "./data/drone_params.toml"
-const bb_params_file = "./data/sfmta/sf_bb_params.toml"
-const city_travel_time_estimates = "./data/sfmta/sf_halton_tt_estimates.jld2"
-const out_file = "./data/temp_mult_generic.json"
-
-# const city_params_file = "./data/wmata/wdc_params.toml"
-# const bb_params_file = "./data/wmata/wdc_params.toml"
-# const stop_coords_file = "./data/wmata/stop_to_coords.json"
-# const trips_file = "./data/wmata/trips.json"
+# const city_params_file = "./data/sfmta/sf_params.toml"
+# const stop_coords_file = "./data/sfmta/stop_to_coords.json"
+# const trips_file = "./data/sfmta/trips.json"
 # const drone_params_file = "./data/drone_params.toml"
+# const bb_params_file = "./data/sfmta/sf_bb_params.toml"
+# const city_travel_time_estimates = "./data/sfmta/sf_halton_tt_estimates.jld2"
 # const out_file = "./data/temp_mult_generic.json"
+
+const city_params_file = "./data/wmata/wdc_params.toml"
+const bb_params_file = "./data/wmata/wdc_params.toml"
+const stop_coords_file = "./data/wmata/stop_to_coords.json"
+const trips_file = "./data/wmata/trips.json"
+const drone_params_file = "./data/drone_params.toml"
+const city_travel_time_estimates = "./data/wmata/wdc_halton_tt_estimates.jld2"
+const out_file = "./data/temp_mult_generic.json"
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (3, 5)
-const ECBS_WEIGHT = 1.05
+const ECBS_WEIGHT = 1.1
 
 ## Hard-code a bunch of depots and many more sites
 # SF DEPOTS
-const DEPOT1 = LatLonCoords((lat = 37.762892, lon = -122.472193))
-const DEPOT2 = LatLonCoords((lat = 37.751751, lon = -122.410654))
-const DEPOT3 = LatLonCoords((lat = 37.718779, lon = -122.462401))
-depots = [DEPOT1, DEPOT2, DEPOT3]
+# const DEPOT1 = LatLonCoords((lat = 37.762892, lon = -122.472193))
+# const DEPOT2 = LatLonCoords((lat = 37.751751, lon = -122.410654))
+# const DEPOT3 = LatLonCoords((lat = 37.718779, lon = -122.462401))
+# depots = [DEPOT1, DEPOT2, DEPOT3]
 
 # WDC DEPOTS
-# const DEPOT1 = LatLonCoords((lat = 38.873413, lon = -77.183164))
-# const DEPOT2 = LatLonCoords((lat = 38.891249, lon = -76.934652))
-# const DEPOT3 = LatLonCoords((lat = 38.975575, lon = -77.030623))
-# const DEPOT4 = LatLonCoords((lat = 38.796760, lon = -76.976235))
-# depots = [DEPOT1, DEPOT2, DEPOT3, DEPOT4]
+const DEPOT1 = LatLonCoords((lat = 38.873413, lon = -77.183164))
+const DEPOT2 = LatLonCoords((lat = 38.891249, lon = -76.934652))
+const DEPOT3 = LatLonCoords((lat = 38.975575, lon = -77.030623))
+const DEPOT4 = LatLonCoords((lat = 38.796760, lon = -76.976235))
+const DEPOT5 = LatLonCoords((lat = 38.915612, lon = -77.036875))
+depots = [DEPOT1, DEPOT2, DEPOT3, DEPOT4, DEPOT5]
 
-const N_DEPOTS = length(depots)
+
 # Change this one
-const N_AGENTS = 100
+const N_DEPOTS = length(depots)
+const N_AGENTS = 20
 const N_SITES = 3*N_AGENTS
 
 
@@ -82,7 +85,7 @@ env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = 
                      agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
                      stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                     curr_site_points = [])
+                     curr_site_points = [], threshold_global_conflicts = 5)
 
 # cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
 # cost_fn(i, j) = MultiAgentAllocationTransit.distance_lat_lon_euclidean(depot_sites[i], depot_sites[j])
@@ -109,6 +112,8 @@ end
 solver = ECBSSolver{MAPFTransitVertexState,MAPFTransitAction,Float64,Makespan,MAPFTransitConflict,MAPFTransitConstraints,MAPFTransitEnv}(env = env, weight = ECBS_WEIGHT)
 
 solution = search!(solver, initial_states)
+
+initial_sites = [env.state_graph.vertices[env.depot_sites_to_vtx[string("s-", agent_tasks[i].site)]].state.location for i = 1:true_n_agents]
 
 # env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
 #                      agent_states = agent_states, depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
