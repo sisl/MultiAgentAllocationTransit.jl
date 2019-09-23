@@ -6,8 +6,8 @@ using Images
 
 bg_map_fn = "./data/wdc_viz_bb.png"
 bb_fn = "./data/wmata/wdc_params.toml"
-solution_fn = "./data/viz_soln_wdc_83agts.jld2"
-out_gif_name = "./data/viz_soln_wdc_83agts.gif"
+solution_fn = "./data/viz_soln_wdc_110agts.jld2"
+out_gif_name = "./data/viz_soln_wdc_110agts_600dpi.gif"
 time_step = 10.0
 fps = 24
 
