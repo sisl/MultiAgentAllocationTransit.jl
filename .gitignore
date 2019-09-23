@@ -1,1 +1,5 @@
 data/
+
+# These scripts are for hacking and plotting
+scripts/test_mult_agents_generic.jl
+scripts/plot_solution.jl
