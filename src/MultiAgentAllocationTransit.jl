@@ -89,12 +89,6 @@ export
 
 # Task Allocation
 export
-    min_connecting_tour,
-    get_connected_depots,
-    add_merged_depot_edges!,
-    get_multiedge_eulerian_tour,
-    trim_circuit!,
-    cut_tours,
     task_allocation,
     get_agent_task_set,
     get_next_agent_task

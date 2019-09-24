@@ -77,33 +77,6 @@ end
 
 
 
-
-## Creates a nearest neighbor tree with stop locations
-## Returns the index from nn row to stop ID
-function stop_locations_nearest_neighbors(stop_to_location::Dict{Int64,LOC}, metric::M) where {LOC, M <: Metric}
-
-    n_stops = length(collect(keys(stop_to_location)))
-    nn_idx_to_stop = Vector{Int64}(undef, n_stops)
-
-    VType = vector_type(LOC)
-
-    data = Vector{VType}(undef, n_stops)
-
-    # Assume stop_to_location keys are integers
-    for (idx, stop_id) in enumerate(collect(keys(stop_to_location)))
-
-        data[idx] = convert_to_vector(stop_to_location[stop_id])
-        nn_idx_to_stop[idx] = stop_id
-
-    end
-
-    stops_nn_tree = BallTree(data, metric)
-
-    return stops_nn_tree, nn_idx_to_stop
-
-end # function
-
-
 function get_stop_idx_to_trip_ids(tg::TG) where {TG <: TransitGraph}
 
     stop_idx_to_trips = Dict{Int64,Set{Int64}}()
@@ -144,47 +117,6 @@ function true_stop_to_locations(stop_to_location::Dict{Int64,LOC}, stop_idx_to_t
     end
 
     return true_stop_to_locs
-
-end
-
-
-# Compute the minimum pairwise distance between depots and sites either through direct flight
-# OR by using the Time Invariant Route Graph
-function generate_depot_to_sites_dists(otg::OffTransitGraph, tg::TransitGraph, stops_nn_tree::NNTree,
-                                       nn_idx_to_stop::Vector{Int64}, stop_idx_to_trips::Dict{Int64,Set{Int64}},
-                                       trips_fws_dists::Matrix{Float64}, dist_fn::Function)
-
-    depot_to_sites_dists = zeros(length(otg.depots), length(otg.sites))
-
-    for (d, depot_loc) in enumerate(otg.depots)
-        for (s, site_loc) in enumerate(otg.sites)
-
-            depot_vect = convert_to_vector(depot_loc)
-            d_nn_idxs, d_nn_dists = knn(stops_nn_tree, depot_vect, 1)
-            d_nn_idx = d_nn_idxs[1]
-            d_nn_dist = d_nn_dists[1]
-            d_nn_stop = nn_idx_to_stop[d_nn_idx]
-
-            site_vect = convert_to_vector(site_loc)
-            s_nn_idxs, s_nn_dists = knn(stops_nn_tree, site_vect, 1)
-            s_nn_idx = s_nn_idxs[1]
-            s_nn_dist = s_nn_dists[1]
-            s_nn_stop = nn_idx_to_stop[s_nn_idx]
-
-            min_trip_to_trip = Inf
-            for d_nn_trip_id in stop_idx_to_trips[d_nn_stop]
-                for s_nn_trip_id in stop_idx_to_trips[s_nn_stop]
-                    min_trip_to_trip = (trips_fws_dists[d_nn_trip_id, s_nn_trip_id] < min_trip_to_trip) ? trips_fws_dists[d_nn_trip_id, s_nn_trip_id] : min_trip_to_trip
-                end
-            end
-
-            # Either direct flight OR through trips
-            mindist = min(dist_fn(depot_loc, site_loc), d_nn_dist + s_nn_dist + min_trip_to_trip)
-            depot_to_sites_dists[d, s] = mindist
-        end
-    end
-
-    return depot_to_sites_dists
 
 end
 

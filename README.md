@@ -13,7 +13,7 @@ Also, there are several moving parts to the code, and the two main units, graph 
 Thus, I've been a bit lazy with testing here, but I might add some basic integration tests later.
 
 
-## Setup
+## Setup and Notebook
 The `MultiAgentAllocationTransit` repository is set up as a package with its own environment in [Julia 1.0](https://julialang.org/downloads/). Look at **Using someone else's project** at the Julia [package manager documentation](https://julialang.github.io/Pkg.jl/v1/environments/#Using-someone-else's-project-1) for the basic idea. To get the code up and running (after having installed Julia), first `cd` into the `MultiAgentAllocationTransit` folder.
 Then start the Julia REPL and go into [package manager](https://julialang.github.io/Pkg.jl/v1/getting-started/) mode by pressing `]`, followed by:
 ```shell
@@ -50,4 +50,21 @@ Here is another example, with 110 agents, in the Washington DC Metropolitan Area
 
 
 ### Code Overview
-TODO
+
+I've given a brief overview of the code in the `src/` folder, and an even more brief outline of the `scripts/` folder. Some of the important structs and methods in the various files have additional comments. The `multi-drone-routing-example` notebook is a good illustration of how the code is actually used.
+
+- `src/gtfs_parser.jl`: Various utilities for converting the GTFS files for the transit networks into a form usable by me
+- `src/load_transit_env.jl`: A handful of utilities for loading up the operation graph from the parsed GTFS files
+- `src/preprocessing.jl`: Implements the functions for the two main preprocessing steps - computing the surrogate travel time estimate and the admissible heuristic on the flight distance
+- `src/task_allocation.jl`: Implements the _MergeSplitTours_ algorithm for the delivery sequence allocation layer.
+- `src/mapf_transit.jl`: Implements everything necessary to use the Enhanced CBS Solver from [MultiAgentPathFinding.jl](https://github.com/Shushman/MultiAgentPathFinding.jl) for the MAPF-TN layer.
+- `scripts/test_*.jl`: Hacked scripts for playing around. Ignore.
+- `scripts/benchmark_*.jl`: The various scripts used for the results in the paper. The benchmarks should be reproducible if you parse the GTFS files (not uploaded) to the corresponding JSON files, run `preprocess_travel_time_estimates.jl` to save the surrogate object that is the loaded by the benchmark scripts, and use the same `MersenneTwister` as mentioned in the script. The separate `benchmark_mult_agents_light.jl` script uses the direct flight time as the surrogate instead of the preprocessed estimate (this could have been an argument to `benchmark_multi_agents.jl`, but I got lazy).
+
+**Note on Reproducibility**
+</br>
+The allocation and replanning benchmarks should be straightforward to reproduce.
+The one caveat is that for settings with l/m = 10, the trials would take very long much more often. Therefore, I reduced the `env.threshold_global_conflicts`
+from 10 to 5 while running benchmarks (the solver throws an exception after 5 high-level conflicts). At some point, I'll take a deeper dive into handling many high-level conflicts better, or just have more functionality for terminating easily.
+</br>
+In general, it is very important to me that anyone re-running this be able to reproduce numbers/results. Please email me at shushmanchoudhury@gmail.com if you have any issues or need any help.
