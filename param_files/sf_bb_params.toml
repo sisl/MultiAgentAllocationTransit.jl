@@ -1,0 +1,5 @@
+# The actual bounding box within which to generate locations
+LATSTART = 37.707040
+LONSTART = -122.507640
+LATEND = 37.79687152841195
+LONEND = -122.39409426094448

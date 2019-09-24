@@ -129,18 +129,15 @@ end
 
 
 @with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph,
-                                       TG <: TransitGraph, NN <: NNTree, MVTS <: MAPFTransitVertexState} <: MAPFEnvironment
+                                       TG <: TransitGraph, MVTS <: MAPFTransitVertexState} <: MAPFEnvironment
     off_transit_graph::OTG
     transit_graph::TG
     state_graph::SimpleVListGraph{MVTS}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
     agent_states::Vector{AgentState}
     depot_sites_to_vtx::Dict{String,Int64}                          # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
-    trip_to_vtx_range::Vector{Tuple{Int64,Int64}}
-    stops_nn_tree::NN                                               # Nearest neighbor tree for stop locations
-    nn_idx_to_stop::Vector{Int64}                                   # Maps the ID from NNTree to stop id
+    trip_to_vtx_range::Vector{Tuple{Int64,Int64}}# Maps the ID from NNTree to stop id
     stop_idx_to_trips::Dict{Int64,Set{Int64}}                       # Maps the stop ID to trips passing through them
     trips_fws_dists::Matrix{Float64}
-    depot_to_sites_dists::Matrix{Float64}
     drone_params::DroneParams
     dist_fn::Function
     curr_site_points::Vector{Int64}

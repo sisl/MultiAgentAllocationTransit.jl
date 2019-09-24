@@ -6,6 +6,9 @@ using BenchmarkTools
 using Statistics
 using JSON
 using Logging
+using JLD2
+using NearestNeighbors
+using StaticArrays
 global_logger(SimpleLogger(stderr, Logging.Error))
 
 rng = MersenneTwister(2345)
@@ -17,12 +20,15 @@ const trips_file = ARGS[3]
 const drone_params_file = ARGS[4]
 const bb_params_file = ARGS[5]
 const out_file_pref = ARGS[6]
-const N_DEPOTS = parse(Int64, ARGS[7])
-const N_AGENTS = parse(Int64, ARGS[8])
-const N_TRIALS = parse(Int64, ARGS[9])
+const city_travel_time_estimates = ARGS[7]
+const N_DEPOTS = parse(Int64, ARGS[8])
+const N_AGENTS = parse(Int64, ARGS[9])
+const N_TRIALS = parse(Int64, ARGS[10])
 
 const TRANSIT_CAP_RANGE = (3, 5)
-const ECBS_WEIGHT = 1.05
+const ECBS_WEIGHT = 1.1
+
+# julia scripts/benchmark_replanning.jl data/sfmta/sf_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_bb_params.toml data/sf_replan_20trials data/sfmta/sf_halton_tt_estimates.jld2 5 10 20
 
 
 function main()
@@ -37,9 +43,11 @@ function main()
 
     # Transit Graph Preprocessing
     tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
-    tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
-                    transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
+    tg, stop_idx_to_trips = transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
+
+    # Load Halton stuff
+    @load city_travel_time_estimates halton_nn_tree city_halton_points travel_time_estimates
 
     replan_results = Dict("cap_range"=>TRANSIT_CAP_RANGE, "weight"=>ECBS_WEIGHT,
                         "depots"=>N_DEPOTS, "agents"=>N_AGENTS)
@@ -50,7 +58,8 @@ function main()
     rp_all_msps = Float64[]
 
     # No need to ignore first trial now!
-    for TRIAL = 1:N_TRIALS
+    TRIAL = 1
+    while TRIAL <= N_TRIALS+1
 
         N_SITES = 2*N_AGENTS
 
@@ -63,8 +72,10 @@ function main()
 
         # Off transit preprocessing
         otg = OffTransitGraph(depots = depots, sites = sites)
-        depot_to_sites_dists = generate_depot_to_sites_dists(otg, tg, stops_nn_tree, nn_idx_to_stop, stop_idx_to_trips,
-                                    trips_fws_dists, MultiAgentAllocationTransit.distance_lat_lon_euclidean)
+        trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+                                                              length(depots), length(sites),
+                                                              vcat(depots, sites),
+                                                              drone_params)
         state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 
 
@@ -72,18 +83,17 @@ function main()
         # Set up the shadow env to do task allocation with
         env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                              agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                             stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                             trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
+                             stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
                              drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                             curr_site_points = [])
+                             curr_site_points = [], threshold_global_conflicts = 10)
 
         # run the task allocation, obtain the agent tasks and true number of agents
-        cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
+        cost_fn(i, j) = allocation_cost_wrapper_estimate(env, ECBS_WEIGHT, N_DEPOTS, N_SITES,
+                                                        halton_nn_tree, travel_time_estimates, i, j)
         agent_tours = task_allocation(N_DEPOTS, N_SITES, N_AGENTS,
                                       depot_sites, cost_fn)
 
         println("Task Allocation Done!")
-        @show agent_tours
 
 
         agent_tasks = get_agent_task_set(agent_tours, N_DEPOTS, N_SITES)
@@ -107,35 +117,44 @@ function main()
 
         println("Initial solution obtained!")
 
-        # Copy env and solution for replanning
-        env_copy = deepcopy(env)
-        solution_copy = deepcopy(solution)
+        # Compute env diagnostics and throw away if invalid
+        set_solution_diagnostics!(env, solution)
+        n_valid_firstpaths = length(env.valid_path_dists)
 
-        # Actually run the replanning
-        did_replan_indiv, el_time_indiv = replan_individual!(env, solution, N_DEPOTS, N_SITES, agent_tours, ECBS_WEIGHT)
-        did_replan_collec, el_time_collec, new_soln_collec = replan_collective!(env_copy, solution_copy, N_DEPOTS, N_SITES, agent_tours, ECBS_WEIGHT)
+        if n_valid_firstpaths > 0.67 * true_n_agents
 
-        # Enter only if both valid
-        if did_replan_indiv && did_replan_collec
+            # Copy env and solution for replanning
+            env_copy = deepcopy(env)
+            solution_copy = deepcopy(solution)
 
-            println("Replanning done successfully!")
+            # Actually run the replanning
+            did_replan_indiv, el_time_indiv = replan_individual!(env, solution, N_DEPOTS, N_SITES, agent_tours, ECBS_WEIGHT)
+            did_replan_collec, el_time_collec, new_soln_collec = replan_collective!(env_copy, solution_copy, N_DEPOTS, N_SITES, agent_tours, ECBS_WEIGHT)
 
-            # Now look at times and makespans
-            msp_one = maximum([s.cost for s in solution])
-            msp_all = maximum([s.cost for s in new_soln_collec])
+            # Enter only if both valid
+            if did_replan_indiv && did_replan_collec
 
-            push!(rp_one_times, el_time_indiv)
-            push!(rp_one_msps, msp_one)
+                println("Replanning done successfully!")
 
-            push!(rp_all_times, el_time_collec)
-            push!(rp_all_msps, msp_all)
+                # Now look at times and makespans
+                msp_one = maximum([s.cost for s in solution])
+                msp_all = maximum([s.cost for s in new_soln_collec])
 
-        else
+                push!(rp_one_times, el_time_indiv)
+                push!(rp_one_msps, msp_one)
 
-            println("No replan! Indiv - $(did_replan_indiv); Collec - $(did_replan_collec)")
+                push!(rp_all_times, el_time_collec)
+                push!(rp_all_msps, msp_all)
 
+                # Increment trial
+                TRIAL = TRIAL + 1
+
+            else
+
+                println("No replan! Indiv - $(did_replan_indiv); Collec - $(did_replan_collec)")
+
+            end
         end
-
     end
 
     replan_results["results"] = Dict("replan_one_times" => rp_one_times,

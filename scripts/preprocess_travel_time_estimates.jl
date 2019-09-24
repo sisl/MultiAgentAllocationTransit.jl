@@ -27,7 +27,7 @@ const city_tt_outfile = ARGS[5]
 const n_halton_points = parse(Int64, ARGS[6])
 
 const TRANSIT_CAP_RANGE = (3, 5)
-const ECBS_WEIGHT = 1.05
+const ECBS_WEIGHT = 1.1
 
 
 

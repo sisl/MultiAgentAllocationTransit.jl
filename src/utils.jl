@@ -210,3 +210,97 @@ function get_halton_sequence(n::Int64, bases::Vector{Int64}, lower::Vector{Float
 
     return grid_scaled_points
 end
+
+
+
+
+function plot_depots_sites!(background::Plots.Plot,side_x::Int64, side_y::Int64, bb_params::CityParams, depots::Vector{LatLonCoords}, sites::Vector{LatLonCoords},
+                            depot_size::Int64=15, site_size::Int64=5)
+
+    londiff = bb_params.lon_end - bb_params.lon_start
+    latdiff = bb_params.lat_end - bb_params.lat_start
+
+    for dep in depots
+
+        xpos = convert(Int64, round((dep.lon - bb_params.lon_start)*side_x/londiff))
+        ypos = convert(Int64, round((dep.lat - bb_params.lat_start)*side_y/latdiff))
+
+        scatter!(background, [xpos], [ypos], markershape=:pentagon, markersize=depot_size, markercolor=:black, markerstrokewidth=0)
+    end
+
+    for site in sites
+
+        xpos = convert(Int64, round((site.lon - bb_params.lon_start)*side_x/londiff))
+        ypos = convert(Int64, round((site.lat - bb_params.lat_start)*side_y/latdiff))
+
+        scatter!(background, [xpos], [ypos], markershape=:rect, markersize=site_size, markercolor=:grey, markerstrokecolor=:black)
+    end
+end
+
+
+## For plotting
+# Takes the static plot with depots + map
+function render_drones(background::Plots.Plot, side_x::Int64, side_y::Int64, bb_params::CityParams, time_val::Float64,
+                       solution::Vector{PR}, drone_size::Int64=10) where {PR <: PlanResult}
+
+    p = deepcopy(background)
+
+    # Loop over agents and add if still flying
+    n_agents = length(solution)
+
+    londiff = bb_params.lon_end - bb_params.lon_start
+    latdiff = bb_params.lat_end - bb_params.lat_start
+
+    for idx = 1:n_agents
+
+        agt_soln_states = solution[idx].states
+
+        pre_state_idx = 0
+        post_state_idx = 0
+
+        for (si, (state, t)) in enumerate(agt_soln_states)
+            if t >= time_val
+                post_state_idx = si
+                break
+            end
+        end
+
+        if post_state_idx > 0 && post_state_idx <= length(agt_soln_states)
+
+            @assert post_state_idx > 1 "$(time_val) is too short for agent $(idx)!"
+
+            pre_state_idx = post_state_idx - 1
+
+            pre_time = agt_soln_states[pre_state_idx][2]
+            post_time = agt_soln_states[post_state_idx][2]
+
+            pre_loc = agt_soln_states[pre_state_idx][1].state.location
+            post_loc = agt_soln_states[post_state_idx][1].state.location
+
+            # Get interpolated position
+            interp_factor = (time_val - pre_time)/(post_time - pre_time)
+            new_lat = pre_loc.lat + interp_factor*(post_loc.lat - pre_loc.lat)
+            new_lon = pre_loc.lon + interp_factor*(post_loc.lon - pre_loc.lon)
+
+            # Only on car if previous and current are both r
+            pre_str = agt_soln_states[pre_state_idx][1].vertex_str
+            post_str = agt_soln_states[post_state_idx][1].vertex_str
+
+            if startswith(pre_str, "r") && startswith(post_str, "r")
+                dr_color = :red
+            else
+                dr_color = :blue
+            end
+
+            # Now obtain normalized position
+            # Longitude corresponds to x
+            xpos = convert(Int64, round((new_lon - bb_params.lon_start)*side_x/londiff))
+            ypos = convert(Int64, round((new_lat - bb_params.lat_start)*side_y/latdiff))
+
+            scatter!(p, [xpos], [ypos], markershape=:circle, markersize=drone_size, markercolor=dr_color, markerstrokecolor=:black)
+
+        end
+    end
+
+    return p
+end
