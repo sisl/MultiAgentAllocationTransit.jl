@@ -1,8 +1,7 @@
-## General utilities used across the board
-
 """
-Compute the Euclidean distance between two lat-long coordinates close to each other.
-Distance in km
+    distance_lat_lon_euclidean(coords1::LatLonCoords, coords2::LatLonCoords)
+
+Compute the Euclidean distance in kilometresbetween two lat-long coordinates close to each other.
 """
 function distance_lat_lon_euclidean(coords1::LatLonCoords, coords2::LatLonCoords)
     deglen = 110.25
@@ -27,7 +26,9 @@ function hhmmss_to_seconds(time_str::String)
     return dot(int_arr, time_arr)
 end
 
-## coords_bb - low and hi are the lower and upper corners respectively
+"""
+Sample locations from a Uniform distribution within the bounding box.
+"""
 function generate_sites(coords_bb_lo::LatLonCoords, coords_bb_hi::LatLonCoords,
                         n_sites::Int64, rng::RNG) where {RNG <: AbstractRNG}
 
@@ -46,6 +47,14 @@ function generate_sites(coords_bb_lo::LatLonCoords, coords_bb_hi::LatLonCoords,
 
 end # function
 
+"""
+    get_non_dominated_trip_points(env::MAPFTransitEnv, avoid_vertex_idxs::Set{Int64},
+                                  vtx::MAPFTransitVertexState, tid::Int64)
+
+Use Kung's algorithm for d = 2 (very simple) to get the stops on a trip that
+are non-dominated by other stops on the same trip for the (elapsed time, flight distance) metric
+ - See Appendix for details.
+"""
 function get_non_dominated_trip_points(env::MAPFTransitEnv, avoid_vertex_idxs::Set{Int64},
                                        vtx::MAPFTransitVertexState, tid::Int64)
 
@@ -181,7 +190,7 @@ function Distances.evaluate(::EuclideanLatLong,
 end
 
 
-## Halton sequence for space coverage
+
 function get_halton_value(index::Int64, base::Int64)
 
     res = 0
@@ -196,7 +205,10 @@ function get_halton_value(index::Int64, base::Int64)
     return res
 end
 
-
+"""
+Sample d-dimensional Halton points between lower and upper limits. Discard the first x points,
+where x is the value of the discard::Int64 parameter.
+"""
 function get_halton_sequence(n::Int64, bases::Vector{Int64}, lower::Vector{Float64}, upper::Vector{Float64},
                              discard::Int64)
 
@@ -238,8 +250,9 @@ function plot_depots_sites!(background::Plots.Plot,side_x::Int64, side_y::Int64,
 end
 
 
-## For plotting
-# Takes the static plot with depots + map
+"""
+Takes as input the static background obtained from plot_depots_sites!
+"""
 function render_drones(background::Plots.Plot, side_x::Int64, side_y::Int64, bb_params::CityParams, time_val::Float64,
                        solution::Vector{PR}, drone_size::Int64=10) where {PR <: PlanResult}
 

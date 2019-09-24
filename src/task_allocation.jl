@@ -1,6 +1,7 @@
-# cost_fn returns infinite for excluded edges
-# TODO : Exclude if depot_sites_dist > limit?
-# TODO : Incorporate travel times
+"""
+Runs the MCT step of MergeSplitTours. Assumes that cost_fn(i, j)
+returns the surrogate estimate for travel time between depot_sites[i] and depot_sites[j]
+"""
 function min_connecting_tour(n_depots::Int64, n_sites::Int64,
                              depot_sites::Vector{LOC},
                              cost_fn::F) where {LOC, F <: Function}
@@ -20,6 +21,8 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
             # Exclude self-edges and site-site edges
             if i != j && (i <= n_depots || j <= n_depots)
                 edge_cost = cost_fn(i, j)
+
+                # Also exclude edges that do not have an estimate, i.e. any dispatch constraints
                 if edge_cost < Inf
                     # First insert cost and idx
                     push!(cost_vector, edge_cost)
@@ -39,9 +42,6 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
             end
         end
     end
-
-    # @show depot_site_vector_idx
-    # @show vector_idx_to_depot_site
 
     # Since x vector will be subset of (l+k) x (l+k), need to maintain a map
     # from (l,k) to index and index to (l,k)
@@ -71,10 +71,7 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
             end
         end
     end
-    # @show depot_site_mask
     @constraint(model, depot_site_mask * x .<= ones(n_depots*n_sites*2)) # Depot<->site edges at most once
-
-    # ALL OTHERS ARE DEPOT-DEPOT right? YES!
 
     # Now add constraints for out-edges and in-edges for sites
     site_out_edge_mask = zeros(n_sites, n_idxs)
@@ -139,7 +136,9 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
 end # function
 
 
-# idxs are always 1....n_depots....n_depots+n_sites
+"""
+Get the strongly connected components for depots from the result of MCT.
+"""
 function get_connected_depots(n_depots::Int64, n_sites::Int64, edges::Vector{Tuple{Int64,Int64}})
 
     adj_mat = zeros(Int64, n_depots+n_sites, n_depots+n_sites)
@@ -163,9 +162,6 @@ function get_connected_depots(n_depots::Int64, n_sites::Int64, edges::Vector{Tup
                 end
             end
 
-            # Each component MUST have a depot
-            # @assert ~(isempty(this_comp_depots))
-
             push!(depot_components, this_comp_depots)
         end
     end
@@ -173,7 +169,9 @@ function get_connected_depots(n_depots::Int64, n_sites::Int64, edges::Vector{Tup
     return depot_components
 end
 
-
+"""
+Cluster the depots based on the logic in MergeSplitTours. Edits x_edges::Vector{Int64} in place.
+"""
 function add_merged_depot_edges!(x_edges::Vector{Int64}, depot_comps::Vector{Vector{Int64}},
                                  depot_site_vector_idx::Dict{Tuple{Int64,Int64},Int64}, n_depots::Int64,
                                  n_sites::Int64, cost_vector::Vector{Float64})
@@ -243,7 +241,9 @@ function add_merged_depot_edges!(x_edges::Vector{Int64}, depot_comps::Vector{Vec
     return merged_depot_comps
 end
 
-
+"""
+Compute the Eulerian tour which will be distributed over m agents.
+"""
 function get_multiedge_eulerian_tour(x_edges::Vector{Int64}, vector_idx_to_depot_site::Dict{Int64,Tuple{Int64,Int64}},
                                      n_depots::Int64, n_sites::Int64)
 
@@ -303,9 +303,10 @@ function get_multiedge_eulerian_tour(x_edges::Vector{Int64}, vector_idx_to_depot
     return circuit
 end
 
-# Remove leading and trailing depots except the one just before the
-# first package and the one just after the last package
-# TODO: What if only depots???
+
+"""
+Remove leading and trailing depots except the one just before the first package and the one just after the last package
+"""
 function trim_circuit!(circuit::Vector, n_depots::Int64)
 
     # Trim leading depots
@@ -327,6 +328,10 @@ function trim_circuit!(circuit::Vector, n_depots::Int64)
 
 end
 
+
+"""
+Distribute the tour over m agents. The final step of MergeSplitTours
+"""
 function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64,
                    depot_sites::Vector{LOC}, cost_fn::F) where {LOC, F <: Function}
 
@@ -371,6 +376,9 @@ function cut_tours(circuit::Vector{Int64}, n_depots::Int64, n_agents::Int64,
     return agent_tours
 end
 
+"""
+Combine all of the steps of MergeSplitTours in one function. Also trim the agent sub-tours after to avoid redundancies in sub-tours.
+"""
 function task_allocation(n_depots::Int64, n_sites::Int64, n_agents, depot_sites::Vector{LOC}, cost_fn::F) where {LOC, F <: Function}
 
     edges, x_edges, vds, dsv, cv = min_connecting_tour(n_depots, n_sites, depot_sites, cost_fn)
@@ -405,8 +413,9 @@ end
 
 
 
-# This is only used by mapf layer
-# Get the set of AgentTask instances as a tuple of origin, site, dest
+"""
+(This is only used by the MAPF layer) Get the set of AgentTask instances as a tuple of (origin, site, destination)
+"""
 function get_agent_task_set(agent_tours::Vector{Vector{Int64}}, n_depots::Int64,
                             n_sites::Int64)
 
@@ -428,7 +437,9 @@ function get_agent_task_set(agent_tours::Vector{Vector{Int64}}, n_depots::Int64,
 end
 
 
-# For the given agent tour, get the next task after the finished site
+"""
+For the given agent tour, get the next task after the finished site
+"""
 function get_next_agent_task(agent_tour::Vector{Int64}, n_depots::Int64,
                             n_sites::Int64, finished_site::Int64)
 
