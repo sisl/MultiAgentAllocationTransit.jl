@@ -36,8 +36,6 @@ using Plots
 export
     Location2D,
     LatLonCoords,
-    convert_to_vector,
-    vector_type,
     CityParams,
     parse_city_params,
     DroneParams,
@@ -56,16 +54,11 @@ export
 # Utils
 export
     distance_lat_lon_euclidean,
-    is_in_bounds,
-    hhmmss_to_seconds,
     generate_sites,
     load_depots,
     load_stop_to_location,
     load_transit_routes_single_time,
     EuclideanLatLong,
-    stop_locations_nearest_neighbors,
-    trip_meta_graph_fws_dists,
-    get_stop_idx_to_trip_ids,
     get_non_dominated_trip_points,
     get_halton_sequence,
     plot_depots_sites!,
