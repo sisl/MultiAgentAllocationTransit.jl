@@ -76,6 +76,7 @@ function get_non_dominated_trip_points(env::MAPFTransitEnv, avoid_vertex_idxs::S
     if isempty(time_dist_set)
         return []
     end
+
     # YOU KNOW THIS IS ALREADY SORTED IN INCREASING ETA AND REACHABLE
     non_dom_idxs = Set{Int64}(1)
 
@@ -101,7 +102,12 @@ function get_non_dominated_trip_points(env::MAPFTransitEnv, avoid_vertex_idxs::S
 
 end # function
 
-# Reads in a depot file and returns a vector of depot locations
+
+"""
+    load_depots(depot_file::String)
+
+Reads in a depot file and returns a vector of depot locations.
+"""
 function load_depots(depot_file::String)
 
     open(depot_file, "r") do df
@@ -121,7 +127,11 @@ function load_depots(depot_file::String)
     return depots
 end
 
+"""
+    load_stop_to_location(::Type{LatLonCoords}, stop_coords_file::String)
 
+Loads up the "stop_to_coords.json" dictionary file from GTFS parsing.
+"""
 function load_stop_to_location(::Type{LatLonCoords}, stop_coords_file::String)
 
     stop_coord_dict = Dict()
@@ -139,8 +149,11 @@ function load_stop_to_location(::Type{LatLonCoords}, stop_coords_file::String)
 end
 
 
-## Loads the transit routes from the trips file
-## get_eta_dist creates a Distribution from the individual ETA in the file
+"""
+    load_transit_routes_single_time(trip_file::String)
+
+Loads the transit routes from the trips.json file from GTFS parsing.
+"""
 function load_transit_routes_single_time(trip_file::String)
 
     trips_dict = Dict()
@@ -190,7 +203,11 @@ function Distances.evaluate(::EuclideanLatLong,
 end
 
 
+"""
+    get_halton_value(index::Int64, base::Int64)
 
+Returns the halton sequence value for a given index and base.
+"""
 function get_halton_value(index::Int64, base::Int64)
 
     res = 0
@@ -206,6 +223,9 @@ function get_halton_value(index::Int64, base::Int64)
 end
 
 """
+    get_halton_sequence(n::Int64, bases::Vector{Int64}, lower::Vector{Float64}, upper::Vector{Float64},
+                        discard::Int64)
+
 Sample d-dimensional Halton points between lower and upper limits. Discard the first x points,
 where x is the value of the discard::Int64 parameter.
 """
@@ -224,8 +244,12 @@ function get_halton_sequence(n::Int64, bases::Vector{Int64}, lower::Vector{Float
 end
 
 
+"""
+    plot_depots_sites!(background::Plots.Plot,side_x::Int64, side_y::Int64, bb_params::CityParams, depots::Vector{LatLonCoords}, sites::Vector{LatLonCoords},
+                            depot_size::Int64=15, site_size::Int64=5)
 
-
+Render the depot and package delivery locations on the map background.
+"""
 function plot_depots_sites!(background::Plots.Plot,side_x::Int64, side_y::Int64, bb_params::CityParams, depots::Vector{LatLonCoords}, sites::Vector{LatLonCoords},
                             depot_size::Int64=15, site_size::Int64=5)
 
@@ -251,7 +275,10 @@ end
 
 
 """
-Takes as input the static background obtained from plot_depots_sites!
+    render_drones(background::Plots.Plot, side_x::Int64, side_y::Int64, bb_params::CityParams, time_val::Float64,
+                       solution::Vector{PR}, drone_size::Int64=10) where {PR <: PlanResult}
+
+Takes as input the static background obtained from plot_depots_sites! and plots the drone states.
 """
 function render_drones(background::Plots.Plot, side_x::Int64, side_y::Int64, bb_params::CityParams, time_val::Float64,
                        solution::Vector{PR}, drone_size::Int64=10) where {PR <: PlanResult}
