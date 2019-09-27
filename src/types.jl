@@ -2,6 +2,9 @@ const Location2D = SVector{2, Float64}
 const LatLonCoords = NamedTuple{(:lat, :lon), Tuple{Float64,Float64}}
 LatLonCoords() = (lat = 0.0, lon = 0.0)
 
+"""
+Return the vector form of a latitude-longitude point [lat, lon]
+"""
 function convert_to_vector(c::LatLonCoords)
     return Location2D(c.lat, c.lon)
 end
@@ -13,19 +16,32 @@ vector_type(::Type{LatLonCoords}) = Location2D
     arrival_time::Float64
 end
 
+"""
+    OffTransitGraph{LOC}
 
+Represents the set of locations not on the transit graph.
+"""
 @with_kw struct OffTransitGraph{LOC}
     depots::Vector{LOC}
     sites::Vector{LOC}
 end
 
-# The integer keys are consistent across routes and metadata
+"""
+    TransitGraph{LOC}
+
+Stores information about the transit network. The integer keys are consistent across routes and metadata.
+"""
 @with_kw struct TransitGraph{LOC}
     stop_to_location::Dict{Int64,LOC}               # Maps Stop ID to location
     transit_trips::Vector{Vector{RouteWaypoint}}    # Always in chronological order
     transit_capacity::Vector{Int64}                 # Capacity for each trip - matches transit_trips
 end
 
+"""
+    CityParams
+
+Contains the bounding box (latitude-longitude) parameters for a city.
+"""
 @with_kw struct CityParams
     lat_start::Float64
     lat_end::Float64
@@ -33,6 +49,11 @@ end
     lon_end::Float64
 end
 
+"""
+    parse_city_params(param_file::String)
+
+Return the CityParams object from parsing the corresponding TOML file.
+"""
 function parse_city_params(param_file::String)
 
     params_dict = TOML.parsefile(param_file)
@@ -43,7 +64,11 @@ function parse_city_params(param_file::String)
                       lon_end = params_dict["LONEND"])
 end
 
+"""
+    DroneParams
 
+Contains the operation parameters of a drone (system is homogeneous)
+"""
 @with_kw struct DroneParams
     max_distance::Float64
     max_air_time::Float64
@@ -51,6 +76,11 @@ end
     stop_buffer_time::Float64
 end
 
+"""
+    parse_drone_params(param_file::String)
+
+Return the DroneParams object from parsing the corresponding TOML file.
+"""
 function parse_drone_params(param_file::String)
 
     params_dict = TOML.parsefile(param_file)
@@ -62,46 +92,56 @@ function parse_drone_params(param_file::String)
 end
 
 
+"""
+    MAPFTransitState{LOC}
 
-# Strings are "d-1", "d-2" etc., "s-1", "s-2" etc and "r-1-1", "r-1-2", ... "r-2-1" etc.
+Denotes the time-stamped location of a transit stop.
+"""
 @with_kw struct MAPFTransitState{LOC}
     time::Float64       # Planned time to be at the vertex. For routewaypoint, should be before ETA
-    location::LOC              # The actual vertex string ID (TG or OTG); used with get_location_or_routept
+    location::LOC       # The actual vertex string ID (TG or OTG); used with get_location_or_routept
 end
 
 Base.isequal(s1::MAPFTransitState, s2::MAPFTransitState) = (s1.time, s1.location) == (s2.time, s2.location)
 
 @enum ActionType Stay=1 Fly=2 Board=3
-
-# Empty struct - action implicit
 struct MAPFTransitAction <: MAPFAction
     action::ActionType
 end
 
 
-# Board Conflict - Two drones go to the same ROUTE waypoint
-# Capacity Conflict - A transit route has more drones than it can accommodate
+
 @enum ConflictType Transfer=1 Capacity=2
 
+"""
+Board Conflict - Two drones go to the same route waypoint at same time
+Capacity Conflict - A transit route has more drones than it can accommodate
+"""
 @with_kw struct MAPFTransitConflict <: MAPFConflict
     type::ConflictType
-    overlap_vertices::Set{Int64}
+    overlap_vertices::Set{Int64}          # Which vertex IDs are in the conflicting set
     agent_to_state_idx::Dict{Int64,Int64} # Maps overlapping agent ID to index along state vect
     cap::Int64                      = 1
 end
 
 @enum ConstraintSubPath towards=1 from=2
 
-# Vertex Constraints are basically MAPFTransitState instances for depot/sites
+"""
+Breaks up the transit vertex constraint into vertices on the path FROM depot -> package
+and the vertices TO destination, i.e., from : depot->package, to : package->delivery
+"""
 struct MAPFTransitConstraints <: MAPFConstraints
     avoid_vertex_map::Dict{ConstraintSubPath,Set{Int64}}
 end
-
 MAPFTransitConstraints() = MAPFTransitConstraints(Dict{ConstraintSubPath,Set{Int64}}(towards => Set{Int64}(),
                                                                                      from => Set{Int64}()))
 
 Base.isempty(mtc::MAPFTransitConstraints) = isempty(mtc.avoid_vertex_map[towards]) && isempty(mtc.avoid_vertex_map[from])
 
+"""
+Stores the unique integer ID and string representation of an operation graph vertex.
+Strings are "s-i" for package site i, "d-i" for depot i, "r-i-j" for waypoint j of transit route i.
+"""
 @with_kw mutable struct MAPFTransitVertexState{MTS <: MAPFTransitState} <: MAPFState
     idx::Int64
     state::MTS
@@ -119,11 +159,13 @@ end
 const AgentTask = NamedTuple{(:origin, :site, :dest)}
 
 
-# Tracks the current state of the agent
+"""
+Tracks the current state of the agent; current task; whether it has delivered its package, the distance flown already.
+"""
 @with_kw mutable struct AgentState
     task::AgentTask
     site_crossed::Bool              = false
-    next_finish_time::Float64       = 0.0
+    next_finish_time::Float64       = 0.0   # What is the time-stamp of the next event point
     dist_flown::Float64             = 0.0
 end
 
