@@ -62,6 +62,10 @@ I've given a brief overview of the code in the `src/` folder, and an even more b
 - `src/mapf_transit.jl`: Implements everything necessary to use the Enhanced CBS Solver from [MultiAgentPathFinding.jl](https://github.com/Shushman/MultiAgentPathFinding.jl) for the MAPF-TN layer.
 - `scripts/test_*.jl`: Hacked scripts for playing around. Ignore.
 - `scripts/benchmark_*.jl`: The various scripts used for the results in the paper. The benchmarks should be reproducible if you parse the GTFS files (not uploaded) to the corresponding JSON files, run `preprocess_travel_time_estimates.jl` to save the surrogate object that is the loaded by the benchmark scripts, and use the same `MersenneTwister` as mentioned in the script. The separate `benchmark_mult_agents_light.jl` script uses the direct flight time as the surrogate instead of the preprocessed estimate (this could have been an argument to `benchmark_multi_agents.jl`, but I got lazy).
+Finally, note that for the arguments to the `benchmark_*` scripts, you'll need
+some combination of the parsed GTFS files, preprocessing outputs, and
+parameter files (in `param_files`) for the various arguments.
+
 
 **Note on Reproducibility**
 </br>

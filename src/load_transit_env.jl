@@ -1,4 +1,8 @@
-## Define ALL the functions needed to load an environment
+"""
+    load_depot_site_locations_latlong(filename::String)
+
+Loads saved depot and/or site locations from a file. Not currently used.
+"""
 function load_depot_site_locations_latlong(filename::String)
 
     locations = Vector{LatLonCoords}(undef, 0)
@@ -15,7 +19,11 @@ function load_depot_site_locations_latlong(filename::String)
     return locations
 end
 
+"""
+    load_off_transit_graph_latlong(depot_file::String, site_file::String)
 
+Load depots and sites to create OffTransitGraph. Also not used currently.
+"""
 function load_off_transit_graph_latlong(depot_file::String, site_file::String)
 
     depots = load_depot_site_locations_latlong(depot_file)
@@ -25,6 +33,14 @@ function load_off_transit_graph_latlong(depot_file::String, site_file::String)
 end
 
 
+"""
+    function load_transit_graph_latlong(stop_coords_file::String, trips_file::String,
+                                        transit_cap_range::Tuple{Int64,Int64}, rng::RNG) where {RNG <: AbstractRNG}
+
+Given the stop_to_coordinates.json file, the trips_file, and the range of capacities
+for a transit vehicle, load up the TransitGraph and assign randomly sampled capacities
+to the transit routes.
+"""
 function load_transit_graph_latlong(stop_coords_file::String, trips_file::String,
                                     transit_cap_range::Tuple{Int64,Int64}, rng::RNG) where {RNG <: AbstractRNG}
 
@@ -71,7 +87,11 @@ function load_transit_graph_latlong(stop_coords_file::String, trips_file::String
 
 end
 
-# return the state_graph and depot_sites_to_vtx
+"""
+    setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG <: TransitGraph, OTG <: OffTransitGraph}
+
+Generate the vertices of the operation graph G_O. Create the reverse index from vertex_str to ID.
+"""
 function setup_state_graph(transit_graph::TG, off_transit_graph::OTG) where {TG <: TransitGraph, OTG <: OffTransitGraph}
 
     state_graph = SimpleVListGraph{MAPFTransitVertexState}()

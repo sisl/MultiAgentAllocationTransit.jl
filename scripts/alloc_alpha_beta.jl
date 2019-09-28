@@ -5,6 +5,8 @@ using MultiAgentAllocationTransit
 using Statistics
 using JSON
 
+## IGNORE - Just used to get some alpha beta values for supporting the theorem.
+
 rng = MersenneTwister(2345)
 
 const params_file = ARGS[1]

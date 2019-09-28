@@ -224,7 +224,13 @@ function MultiAgentPathFinding.create_constraints_from_conflict(env::MAPFTransit
     end
 end
 
+"""
+    elapsed_time(env::MAPFTransitEnv,
+                 s1::MAPFTransitVertexState, s2::MAPFTransitVertexState)
 
+Compute the time difference between time-stamped vertices.
+If any not time-stamped, computes the average traversal time.
+"""
 function elapsed_time(env::MAPFTransitEnv,
                       s1::MAPFTransitVertexState, s2::MAPFTransitVertexState)
 
@@ -237,6 +243,11 @@ function elapsed_time(env::MAPFTransitEnv,
     end
 end
 
+"""
+    elapsed_time_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
+
+Computes the trivial heuristic for traversal time from a vertex to the goal.
+"""
 function elapsed_time_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
 
     # Just direct flight time to goal
@@ -245,7 +256,11 @@ function elapsed_time_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
 
 end
 
+"""
+    distance_traversed(env::MAPFTransitEnv, s1::MAPFTransitVertexState, s2::MAPFTransitVertexState)
 
+Computes the flight distance between two operation graph vertices (0 for transit edges).
+"""
 function distance_traversed(env::MAPFTransitEnv, s1::MAPFTransitVertexState, s2::MAPFTransitVertexState)
 
     split1 = split(s1.vertex_str, "-")
@@ -258,7 +273,11 @@ function distance_traversed(env::MAPFTransitEnv, s1::MAPFTransitVertexState, s2:
     end
 end
 
+"""
+    distance_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
 
+Computes the admissible heuristic on flight distance between vertices. See Appendix II-B
+"""
 function distance_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
 
     ssplit = split(s.vertex_str, "-")
@@ -267,7 +286,7 @@ function distance_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
     n_depots = length(env.off_transit_graph.depots)
     n_sites = length(env.off_transit_graph.sites)
 
-    # TODO : Should be correct since state graph is first populated with depots and then sites
+    # NOTE : Should be correct since state graph is first populated with depots and then sites
     depot_site_idx = goal_vtx.idx
 
     if ssplit[1] == "r"
@@ -286,7 +305,8 @@ function distance_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
     end
 end
 
-# Focal state heuristic - min boarding conflicts
+## N.B The focal heuristic functions that follow are the lowest hanging fruit for
+## improving empirical performance of ECBS for search.
 function focal_transition_heuristic_transit(env::MAPFTransitEnv, solution::Vector{PR},
                                             agent_idx::Int64, u::MAPFTransitVertexState, v::MAPFTransitVertexState) where {PR <: PlanResult}
 
@@ -342,10 +362,11 @@ function reachable_by_agent(env::MAPFTransitEnv, s1::MAPFTransitState, s2::MAPFT
 end
 
 
-# Run low level search from current state for agent_idx
-# Agent task is obtained from env.agent_states
-# If site is crossed, don't need to care about that
-# Search is done from the current env reference time (which accounts for rolling horizon)
+"""
+Implements the actual single-agent low-level search for MultiAgentPathFinding.jl's Enhanced CBS.
+Computes the dpd' path with Focal-MCSP twice. Does some hacking to concat paths and to avoid
+searching for a subpath that has no constraints.
+"""
 function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::Int64,
                                                  s::MAPFTransitVertexState, constraints::MAPFTransitConstraints,
                                                  solution::Vector{PR}) where {PR <: PlanResult}
@@ -360,7 +381,7 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     edge_constr_fn(u, v) = distance_traversed(env, u, v)
     edge_constr_functions = [edge_constr_fn]
 
-    edge_constraints = [env.drone_params.max_distance - agent_state.dist_flown] # TODO: Check this!!!
+    edge_constraints = [env.drone_params.max_distance - agent_state.dist_flown]
 
     admissible_heuristic(u) = elapsed_time_heuristic(env, u)
 
@@ -501,11 +522,15 @@ function MultiAgentPathFinding.low_level_search!(solver::ECBSSolver, agent_idx::
     return PlanResult{MAPFTransitVertexState, MAPFTransitAction, Float64}(states, actions, cost, fmin)
 end
 
-# Returns the next state of each agent based on its currently executing solution
-# Also updates the site_crossed flag if so
-# TODO: Assumes that solution[i].states has the correct tuple of (state, cost)
-# Also assumes that agent has not finished yet
-# Also assumes that solution[i].actions tracks the weight costs
+# NOTE: Assumes that solution[i].states has the correct tuple of (state, cost)
+"""
+    update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
+                         solution::Vector{PR}) where {PR <: PlanResult}
+
+Returns the next state of each agent based on its currently executing solution. Also updates the site_crossed flag if so
+Assumes that agent has not finished yet
+Assumes that solution[i].actions tracks the weight costs
+"""
 function update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
                               solution::Vector{PR}) where {PR <: PlanResult}
 
@@ -529,7 +554,7 @@ function update_agent_states!(env::MAPFTransitEnv, time_val::Float64, agent_idx:
     # Now deal with state_idx
     @assert state_idx <= length(agt_soln_states) "Agent $(agent_idx) has inconsistent time trajectory!; $(time_val); $(agt_soln_states)"
 
-    # TODO: hack to avoid pathological case of agent being at end of solution
+    # NOTE: hack to avoid pathological case of agent being at end of solution
     if state_idx == length(agt_soln_states)
         state_idx = state_idx - 1
         state_time = agt_soln_states[state_idx][2]
@@ -569,7 +594,7 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
     goal_vtx = env.state_graph.vertices[env.curr_goal_idx]
 
     if goal_vtx.vertex_str == v.vertex_str
-        # TODO: Commented out to have a rolling horizon of trips
+        # NOTE: Commented out to have a rolling horizon of trips
         # reset_time(env.state_graph.vertices[env.curr_goal_idx], d)
         return false
     end
@@ -634,10 +659,11 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
     return true
 end
 
+"""
+    get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
 
-
-# Run a single search over a snapshot of the transit network to get the travel time
-# If not reachable, then return Inf
+Runs a single search over a snapshot of the transit network to get the travel time. If not reachable, then return Inf
+"""
 function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
 
     # Get origin idx and destination idx
@@ -667,7 +693,7 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
                                                                            edge_constr_heuristics,
                                                                            edge_constraints)
 
-    # TODO: Not returning Inf to avoid instability?
+    # TODO: Not returning Inf to avoid instability? Hack
     if tgt_entry.v_idx == orig_idx
         @warn "In allocation, edge from $(orig_str) to $(goal_str) is empty!"
         return 100000.
@@ -679,7 +705,12 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
     return costs[end]
 end
 
+"""
+    allocation_cost_wrapper_truett(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
+                                    orig_ds_idx::Int64, goal_ds_idx::Int64)
 
+Use actual travel time between locations by running a full search. Not Used.
+"""
 function allocation_cost_wrapper_truett(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
                                     orig_ds_idx::Int64, goal_ds_idx::Int64)
 
@@ -699,6 +730,13 @@ function allocation_cost_wrapper_truett(env::MAPFTransitEnv, weight::Float64, n_
     return get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
 end
 
+"""
+    allocation_cost_wrapper_estimate(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
+                                     halton_nn_tree::BallTree, estimate_matrix::Matrix{Float64},
+                                     orig_ds_idx::Int64, goal_ds_idx::Int64)
+
+Get the surrogate travel time using the estimate matrix.
+"""
 function allocation_cost_wrapper_estimate(env::MAPFTransitEnv, weight::Float64, n_depots::Int64, n_sites::Int64,
                                           halton_nn_tree::BallTree, estimate_matrix::Matrix{Float64},
                                           orig_ds_idx::Int64, goal_ds_idx::Int64)
@@ -724,9 +762,11 @@ function allocation_cost_wrapper_estimate(env::MAPFTransitEnv, weight::Float64, 
 end
 
 
+"""
+    get_first_finish(solution::Vector{PR}) where {PR <: PlanResult}
 
-# Get the agent that will finish first
-# Also returns the time at which it finishes
+Get the agent that will finish first. Also returns the time at which it finishes
+"""
 function get_first_finish(solution::Vector{PR}) where {PR <: PlanResult}
 
     min_cost = Inf
@@ -742,9 +782,14 @@ function get_first_finish(solution::Vector{PR}) where {PR <: PlanResult}
     return (min_idx, min_cost)
 end
 
-# For single agent replanning, we need the set of all vertex constraints of other
-# agents to ignore as constraints to the replanning agent
-# TODO: How to handle the time issue here? (Just take route vertex indices)
+
+# NOTE: How to handle the time issue here? (Just take route vertex indices)
+"""
+    get_replan_constraints(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
+                          solution::Vector{PR}) where {PR <: PlanResult}
+
+For single agent replanning, we need the set of all vertex constraints of other agents to ignore as constraints to the replanning agent
+"""
 function get_replan_constraints(env::MAPFTransitEnv, time_val::Float64, agent_idx::Int64,
                               solution::Vector{PR}) where {PR <: PlanResult}
 
@@ -769,9 +814,13 @@ function get_replan_constraints(env::MAPFTransitEnv, time_val::Float64, agent_id
     return MAPFTransitConstraints(avoid_vertex_map)
 end
 
-# Get all the info necessary to replan for INDIVIDUAL
-# Returns false if drone has no further task
-# Also returns the planning time
+"""
+    replan_individual!(env::MAPFTransitEnv, solution::Vector{PR},
+                       n_depots::Int64, n_sites::Int64,
+                       agent_tours::Vector{Vector{Int64}}, weight::Float64) where {PR <: PlanResult}
+
+Get all the info necessary to replan for INDIVIDUAL. Returns false if drone has no further task. Also returns the planning time
+"""
 function replan_individual!(env::MAPFTransitEnv, solution::Vector{PR},
                             n_depots::Int64, n_sites::Int64,
                             agent_tours::Vector{Vector{Int64}}, weight::Float64) where {PR <: PlanResult}
@@ -799,9 +848,14 @@ function replan_individual!(env::MAPFTransitEnv, solution::Vector{PR},
 end
 
 
-# Replan collectively! In this we want to update the agent states for all agents
-# and then re-run the solver
-# Returns true if valid, the elapsed time, and the new solution
+"""
+    replan_collective!(env::MAPFTransitEnv, solution::Vector{PR},
+                       n_depots::Int64, n_sites::Int64,
+                       agent_tours::Vector{Vector{Int64}}, weight::Float64) where {PR <: PlanResult}
+
+Replan collectively! In this we want to update the agent states for all agents and then re-run the solver.
+Returns true if valid, the elapsed time, and the new solution
+"""
 function replan_collective!(env::MAPFTransitEnv, solution::Vector{PR},
                             n_depots::Int64, n_sites::Int64,
                             agent_tours::Vector{Vector{Int64}}, weight::Float64) where {PR <: PlanResult}
@@ -839,7 +893,11 @@ function replan_collective!(env::MAPFTransitEnv, solution::Vector{PR},
     return (true, el_time, new_solution)
 end
 
-## Set the number of transit options and valid distances
+"""
+    set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) where {PR <: PlanResult}
+    
+Set the number of transit options and valid distances
+"""
 function set_solution_diagnostics!(env::MAPFTransitEnv, solution::Vector{PR}) where {PR <: PlanResult}
 
     # Iterate over solutions and only update if valid

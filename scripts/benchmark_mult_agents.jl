@@ -11,10 +11,8 @@ using NearestNeighbors
 using StaticArrays
 global_logger(SimpleLogger(stderr, Logging.Error))
 
+## NOTE : Example Calls
 # julia scripts/benchmark_mult_agents.jl data/sfmta/sf_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_bb_params.toml data/sf_mapf_20trials data/sfmta/sf_halton_tt_estimates.jld2 5 10 20
-
-# julia scripts/benchmark_mult_agents.jl data/wmata/wdc_params.toml data/wmata/stop_to_coords.json data/wmata/trips.json data/drone_params.toml data/wmata/wdc_params.toml data/wdc_mapf_20trials 5 10 20
-
 
 rng = MersenneTwister(6789)
 

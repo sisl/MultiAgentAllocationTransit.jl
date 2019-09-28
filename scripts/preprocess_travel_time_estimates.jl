@@ -9,9 +9,7 @@ global_logger(SimpleLogger(stderr, Logging.Error))
 
 rng = MersenneTwister(6789)
 
-# julia scripts/preprocess_travel_time_estimates.jl data/sfmta/sf_bb_params.toml data/sfmta/stop_to_coords.json data/sfmta/trips.json data/drone_params.toml data/sfmta/sf_halton_tt_estimates.jld2 100
-
-
+# EXAMPLES OF ARGUMENTS
 # const bb_params_file = "./data/sfmta/sf_bb_params.toml"
 # const stop_coords_file = "./data/sfmta/stop_to_coords.json"
 # const trips_file = "./data/sfmta/trips.json"

@@ -81,7 +81,11 @@ function augmented_trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
 end
 
 
+"""
+    get_stop_idx_to_trip_ids(tg::TG) where {TG <: TransitGraph}
 
+One-to-many mapping from stop IDs to trip IDs passing through them
+"""
 function get_stop_idx_to_trip_ids(tg::TG) where {TG <: TransitGraph}
 
     stop_idx_to_trips = Dict{Int64,Set{Int64}}()
@@ -102,7 +106,11 @@ function get_stop_idx_to_trip_ids(tg::TG) where {TG <: TransitGraph}
 end
 
 
+"""
+    true_stop_to_locations(stop_to_location::Dict{Int64,LOC}, stop_idx_to_trips::Dict) where {LOC}
 
+Filter out any stops that are not actually used by any trip.
+"""
 function true_stop_to_locations(stop_to_location::Dict{Int64,LOC}, stop_idx_to_trips::Dict) where {LOC}
 
     keys_to_keep = Set{Int64}()
@@ -125,7 +133,13 @@ function true_stop_to_locations(stop_to_location::Dict{Int64,LOC}, stop_idx_to_t
 
 end
 
-# Generate a NN tree over halton points and the index of points
+
+"""
+    generate_city_halton_nn(city_params::CityParams; n_points::Int64 = 100,
+                        bases::Vector{Int64} = [2, 3], discard::Int64 = 0)
+
+Sample a halton sequence of points in a city and create a NNTree with them.
+"""
 function generate_city_halton_nn(city_params::CityParams; n_points::Int64 = 100,
                                  bases::Vector{Int64} = [2, 3], discard::Int64 = 0)
 
@@ -142,7 +156,13 @@ function generate_city_halton_nn(city_params::CityParams; n_points::Int64 = 100,
     return halton_nn_tree, city_halton_points
 end
 
+"""
+    get_travel_time_estimate(halton_nn_tree::BallTree, loc1::LOC, loc2::LOC,
+                             estimate_matrix::Matrix{Float64}) where LOC
 
+Using the surrogate travel time estimate matrix, compute the
+estimate between any two locations by looking up their corresponding nearest rep. location.
+"""
 function get_travel_time_estimate(halton_nn_tree::BallTree, loc1::LOC, loc2::LOC,
                                   estimate_matrix::Matrix{Float64}) where LOC
 
@@ -160,6 +180,11 @@ function get_travel_time_estimate(halton_nn_tree::BallTree, loc1::LOC, loc2::LOC
     return estimate_matrix[loc1_idx, loc2_idx]
 end
 
+"""
+    compute_all_pairs_estimates(env::MAPFTransitEnv, n_halton_points::Int64, weight::Float64)
+
+Preprocessing. Compute the pairwise travel times between pairs of Voronoi sites. See Appendix III
+"""
 function compute_all_pairs_estimates(env::MAPFTransitEnv, n_halton_points::Int64, weight::Float64)
 
     travel_time_estimates = zeros(n_halton_points, n_halton_points)
