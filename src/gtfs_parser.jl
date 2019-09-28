@@ -1,3 +1,10 @@
+"""
+    generate_stop_file(stop_txt::String, params::CityParams, out_file::String)
+
+Convert the stops.txt GTFS file for a transit network to a dict that maps
+integer stop ID to lat-long coordinates, and saves it to an output JSON file.
+The CityParams is used to filter out trips outside the bounding box.
+"""
 function generate_stop_file(stop_txt::String, params::CityParams, out_file::String)
 
     stop_file = CSV.File(stop_txt)
@@ -38,11 +45,14 @@ function generate_stop_file(stop_txt::String, params::CityParams, out_file::Stri
 
 end
 
-## Loop through route IDs
-## Choose any one trip randomly with that route ID - note TRIP ID
-## Go to stop_times, look up stop sequence and STOP IDs for the trip, note TIMES
-## Ignore trips with any stops outside bounding box
-## Save trips with zero-relative time in another file
+"""
+    generate_trip_file(route_txt::String, trip_txt::String,
+                       stop_time_txt::String, stop_coords::Dict{Int64,LatLonCoords},
+                       out_file::String, rng::RNG) where {RNG <: AbstractRNG}
+
+Parse the GTFS trips.txt file. Takes the routes.txt file, chooses any trip from that
+route type, and generates the corresponding sequence of stop IDs from the stop_coords Dict.
+"""
 function generate_trip_file(route_txt::String, trip_txt::String,
                             stop_time_txt::String, stop_coords::Dict{Int64,LatLonCoords},
                             out_file::String, rng::RNG) where {RNG <: AbstractRNG}

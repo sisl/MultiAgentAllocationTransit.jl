@@ -72,7 +72,7 @@ function main()
 
         # Off transit preprocessing
         otg = OffTransitGraph(depots = depots, sites = sites)
-        trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+        aug_trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                                                               length(depots), length(sites),
                                                               vcat(depots, sites),
                                                               drone_params)
@@ -83,7 +83,7 @@ function main()
         # Set up the shadow env to do task allocation with
         env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                              agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                             stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
+                             stop_idx_to_trips = stop_idx_to_trips, aug_trips_fws_dists = aug_trips_fws_dists,
                              drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                              curr_site_points = [], threshold_global_conflicts = 10)
 

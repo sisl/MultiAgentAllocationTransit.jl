@@ -1,6 +1,11 @@
-## Create augmented trip metagraph with trip vertices AND depot-sites
-## Then run FWS on them to get min flight distance
-## Index: 1....n_depots....n_depots+n_sites.....n_deps+n_sites+n_trips
+"""
+    augmented_trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
+                                        n_depots::Int64, n_sites::Int64,
+                                        depot_sites::Vector{LOC}, drone_params::DroneParams) where {LOC, TG <: TransitGraph}
+
+Get distance matrix from Floyd-Warshall Shortest Paths alg on the augmented
+trip metagraph. See Appendix II-B for details.
+"""
 function augmented_trip_meta_graph_fws_dists(tg::TG, dist_fn::Function,
                                              n_depots::Int64, n_sites::Int64,
                                              depot_sites::Vector{LOC}, drone_params::DroneParams) where {LOC, TG <: TransitGraph}

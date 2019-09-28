@@ -276,13 +276,13 @@ function distance_heuristic(env::MAPFTransitEnv, s::MAPFTransitVertexState)
 
         mindist = Inf
         for tid in env.stop_idx_to_trips[stop_id]
-            trip_to_ds = env.trips_fws_dists[n_depots + n_sites + tid, depot_site_idx]
+            trip_to_ds = env.aug_trips_fws_dists[n_depots + n_sites + tid, depot_site_idx]
             mindist = (trip_to_ds < mindist) ? trip_to_ds : mindist
         end
 
         return mindist
     else
-        return env.trips_fws_dists[s.idx, depot_site_idx]
+        return env.aug_trips_fws_dists[s.idx, depot_site_idx]
     end
 end
 

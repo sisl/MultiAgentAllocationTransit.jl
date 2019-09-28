@@ -47,7 +47,7 @@ tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE,
 
 tg, stop_idx_to_trips = transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
-trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+aug_trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                                                       length(depots), length(sites),
                                                       vcat(depots, sites),
                                                       drone_params)
@@ -59,7 +59,7 @@ agent_states = [AgentState(task=agt_task) for agt_task in agent_tasks]
 
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                      agent_states = agent_states, depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                     stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
+                     stop_idx_to_trips = stop_idx_to_trips, aug_trips_fws_dists = aug_trips_fws_dists,
                      plan_ref_times = zeros(length(agent_tasks)),
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                      curr_site_points = [0 for _ = 1:length(agent_tasks)])
@@ -80,7 +80,7 @@ agent_states = [AgentState(task=agt_task) for agt_task in agent_tasks]
 
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                      agent_states = agent_states, depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                     stop_idx_to_trips = stop_idx_to_trips, trips_fws_dists = trips_fws_dists,
+                     stop_idx_to_trips = stop_idx_to_trips, aug_trips_fws_dists = aug_trips_fws_dists,
                      plan_ref_times = zeros(length(agent_tasks)), valid_transit_options = zeros(length(agent_tasks)),
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                      curr_site_points = [0 for _ = 1:length(agent_tasks)])

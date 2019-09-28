@@ -43,7 +43,7 @@ lon_dist = Uniform(bb_params.lon_start, bb_params.lon_end)
 
 # Transit Graph Preprocessing
 tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
-tg, stop_idx_to_trips, trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
+tg, stop_idx_to_trips, aug_trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
                 transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
 sites = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_SITES]
@@ -52,7 +52,7 @@ depot_sites = vcat(depots, sites)
 # Load OTG stuff
 otg = OffTransitGraph(depots = depots, sites = sites)
 depot_to_sites_dists = generate_depot_to_sites_dists(otg, tg, stops_nn_tree, nn_idx_to_stop, stop_idx_to_trips,
-                            trips_fws_dists, MultiAgentAllocationTransit.distance_lat_lon_euclidean)
+                            aug_trips_fws_dists, MultiAgentAllocationTransit.distance_lat_lon_euclidean)
 state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 
 
@@ -60,7 +60,7 @@ state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                      agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
                      stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                     trips_fws_dists = trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
+                     aug_trips_fws_dists = aug_trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
                      curr_site_points = [])
 

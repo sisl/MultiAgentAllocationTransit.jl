@@ -169,28 +169,35 @@ Tracks the current state of the agent; current task; whether it has delivered it
     dist_flown::Float64             = 0.0
 end
 
+"""
+    MAPFTransitEnv{OTG <: OffTransitGraph, TG <: TransitGraph, MVTS <: MAPFTransitVertexState} <: MAPFEnvironment
 
+The overarching structure to track the MAPF-TN contextual information.
+
+N.B. - There are some hacks here to track drone state with time for the replanning. The MAPF library
+is typically not well-suited to receding-horizon execution. Email me if you need to figure that out.
+"""
 @with_kw mutable struct MAPFTransitEnv{OTG <: OffTransitGraph,
                                        TG <: TransitGraph, MVTS <: MAPFTransitVertexState} <: MAPFEnvironment
     off_transit_graph::OTG
     transit_graph::TG
-    state_graph::SimpleVListGraph{MVTS}          # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
+    state_graph::SimpleVListGraph{MVTS}                 # Vertex IDs are d-1 etc, s-1 etc, r-1-1 etc.
     agent_states::Vector{AgentState}
-    depot_sites_to_vtx::Dict{String,Int64}                          # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
-    trip_to_vtx_range::Vector{Tuple{Int64,Int64}}# Maps the ID from NNTree to stop id
-    stop_idx_to_trips::Dict{Int64,Set{Int64}}                       # Maps the stop ID to trips passing through them
-    trips_fws_dists::Matrix{Float64}
+    depot_sites_to_vtx::Dict{String,Int64}              # Maps depot and site IDs to their vertex ID in graph - needed for start-goal IDXs
+    trip_to_vtx_range::Vector{Tuple{Int64,Int64}}       # Maps the ID from NNTree to stop id
+    stop_idx_to_trips::Dict{Int64,Set{Int64}}           # Maps the stop ID to trips passing through them
+    aug_trips_fws_dists::Matrix{Float64}                # The distance matrix from the augmented trip metagraph
     drone_params::DroneParams
-    dist_fn::Function
-    curr_site_points::Vector{Int64}
-    curr_goal_idx::Int64                                    = 0
-    plan_ref_times::Vector{Float64}                         = Float64[]
-    # Diagnostics
-    valid_transit_options::Vector{Int64}                    = Int64[]
-    any_invalid_path::Bool                                  = false
-    valid_path_dists::Vector{Float64}                       = Float64[]
-    num_global_conflicts::Int64                             = 0
-    threshold_global_conflicts::Int64                       = 10
+    dist_fn::Function                                   # Implements the distance metric between coordinates (lat-long/grid point)
+    curr_site_points::Vector{Int64}                     # For each agent, which point on its solution vector is the intermediate goal, i.e. p
+    curr_goal_idx::Int64                   = 0          # Tracks the current goal index for each low-level single-agent search
+    plan_ref_times::Vector{Float64}        = Float64[]  # Tracks the system time from which each agent is being planned for
+    # Solution Diagnostics
+    valid_transit_options::Vector{Int64}   = Int64[]    # The number of transit options used by each agent
+    any_invalid_path::Bool                 = false      # Is either subpath of an agent an invalid one, i.e. no weight-constrained path found
+    valid_path_dists::Vector{Float64}      = Float64[]  # For the valid agent subpaths, what is the effective distance covered
+    num_global_conflicts::Int64            = 0          # The number of high-level ECBS conflicts
+    threshold_global_conflicts::Int64      = 10         # The threshold for high-level conflicts after which an error is thrown. TODO: Need to diagnose better
 end
 
 
