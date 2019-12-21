@@ -5,6 +5,7 @@ using MultiAgentAllocationTransit
 using BenchmarkTools
 using Statistics
 using JSON
+using JLD2
 using Logging
 global_logger(SimpleLogger(stderr, Logging.Warn))
 
@@ -17,6 +18,7 @@ const trips_file = "./data/sfmta/trips.json"
 const drone_params_file = "./data/drone_params.toml"
 const bb_params_file = "./data/sfmta/sf_bb_params.toml"
 const out_file = "./data/temp_mult_generic.json"
+const city_travel_time_estimates = "./data/sfmta/sf_halton_tt_estimates.jld2"
 
 # MAPF-TN params
 const TRANSIT_CAP_RANGE = (2, 4)
@@ -43,29 +45,33 @@ lon_dist = Uniform(bb_params.lon_start, bb_params.lon_end)
 
 # Transit Graph Preprocessing
 tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
-tg, stop_idx_to_trips, aug_trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
+tg, stop_idx_to_trips =
                 transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
+
+# Load Halton stuff
+@load city_travel_time_estimates halton_nn_tree city_halton_points travel_time_estimates
 
 sites = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_SITES]
 depot_sites = vcat(depots, sites)
 
 # Load OTG stuff
 otg = OffTransitGraph(depots = depots, sites = sites)
-depot_to_sites_dists = generate_depot_to_sites_dists(otg, tg, stops_nn_tree, nn_idx_to_stop, stop_idx_to_trips,
-                            aug_trips_fws_dists, MultiAgentAllocationTransit.distance_lat_lon_euclidean)
+aug_trips_fws_dists = augmented_trip_meta_graph_fws_dists(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean,
+                                                      length(depots), length(sites),
+                                                      vcat(depots, sites),
+                                                      drone_params)
 state_graph, depot_sites_to_vtx, trip_to_vtx_range = setup_state_graph(tg, otg)
 
 
 # Set the cost function using the wrapper
 env = MAPFTransitEnv(off_transit_graph = otg, transit_graph = tg, state_graph = state_graph,
                      agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                     stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                     aug_trips_fws_dists = aug_trips_fws_dists, depot_to_sites_dists = depot_to_sites_dists,
+                     stop_idx_to_trips = stop_idx_to_trips, aug_trips_fws_dists = aug_trips_fws_dists,
                      drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                     curr_site_points = [])
+                     curr_site_points = [], threshold_global_conflicts = 10)
 
-cost_fn(i, j) = allocation_cost_fn_wrapper(env, ECBS_WEIGHT, N_DEPOTS, N_SITES, i, j)
-
+cost_fn(i, j) = allocation_cost_wrapper_estimate(env, ECBS_WEIGHT, N_DEPOTS, N_SITES,
+                                                                     halton_nn_tree, travel_time_estimates, i, j)
 
 agent_tours = task_allocation(N_DEPOTS, N_SITES, N_AGENTS,
                               depot_sites, cost_fn)
@@ -96,3 +102,5 @@ solution_copy = deepcopy(solution)
 did_replan_indiv, el_time_indiv = replan_individual!(env, solution, N_DEPOTS, N_SITES, agent_tours, ECBS_WEIGHT)
 
 did_replan_collec, el_time_collec, new_soln_collec = replan_collective!(env_copy, solution_copy, N_DEPOTS, N_SITES, agent_tours, ECBS_WEIGHT)
+
+@show el_time_collec

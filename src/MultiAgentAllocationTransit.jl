@@ -18,6 +18,7 @@ using CSV
 using DataFrames
 using Distances
 using NearestNeighbors
+using GeometryTypes
 using IterTools
 using GLPK
 GLPK.jl_set_preemptive_check(false)
@@ -114,5 +115,14 @@ include("preprocessing.jl")
 include("task_allocation.jl")
 include("mapf_transit.jl")
 include("load_transit_env.jl")
+
+
+function Base.convert(::Type{NearestNeighbors.HyperSphere{N,T}}, ghs::GeometryTypes.HyperSphere{N,T}) where {N, T <: AbstractFloat}
+    return NearestNeighbors.HyperSphere{N,T}(ghs.center, ghs.r)
+end
+
+function Base.convert(::Type{GeometryTypes.HyperSphere{N,T}}, nhs::NearestNeighbors.HyperSphere{N,T}) where {N, T <: AbstractFloat}
+    return GeometryTypes.HyperSphere{N,T}(nhs.center, nhs.r)
+end
 
 end # module
