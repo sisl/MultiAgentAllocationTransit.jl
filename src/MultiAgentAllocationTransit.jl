@@ -24,6 +24,8 @@ using GLPK
 GLPK.jl_set_preemptive_check(false)
 using JuMP
 using LightGraphs
+using StatsBase
+using Infiltrator
 
 # Custom
 using TOML
@@ -63,7 +65,9 @@ export
     get_non_dominated_trip_points,
     get_halton_sequence,
     plot_depots_sites!,
-    render_drones
+    render_drones,
+    construct_zipcode_nn,
+    generate_sites_by_income
 
 # GTFS Parser
 export

@@ -344,3 +344,68 @@ function render_drones(background::Plots.Plot, side_x::Int64, side_y::Int64, bb_
 
     return p
 end
+
+
+function construct_zipcode_nn(zipcode_file::String)
+
+    zipcode_dict = Dict()
+    open(zipcode_file, "r") do f
+        zipcode_dict = JSON.parse(f)
+    end
+
+    zipcodepts = SVector{2,Float64}[]
+    zipcodestrs = String[]
+
+    for record in zipcode_dict
+        push!(zipcodepts, convert(SVector{2,Float64}, record["fields"]["geopoint"]))
+        push!(zipcodestrs, record["fields"]["zip"])
+    end
+
+    zipcodetree = BallTree(zipcodepts, EuclideanLatLong())
+
+    return zipcodetree, zipcodestrs
+end
+
+# Rejection Sampling
+function generate_sites_by_income(ztree::BallTree, zstrs::Vector{String},
+                                  zipcode_income_file::String, n_sites::Int64,
+                                  lat_dist::Distribution, lon_dist::Distribution,
+                                  rng::RNG) where {RNG <: AbstractRNG}
+
+    # Parse income file to get info
+    income_dict = TOML.parsefile(zipcode_income_file)
+    income_vect = Float64[]
+    income_zip_vect = String[]
+
+    for (zip, income) in income_dict
+        if zip in zstrs
+            push!(income_zip_vect, zip)
+            push!(income_vect, convert(Float64, income))
+        end
+    end
+    normalize!(income_vect, 1) # Now it is a probability distribution
+
+    sites = LatLonCoords[]
+
+    # Rejection sampling based on
+    for n = 1:n_sites
+
+        # First choose the zipcode using StatsBase
+        income_zcode = sample(income_zip_vect, Weights(income_vect))
+
+        # Now generate point and check nearest neighbor with rejection sampling
+        sampled_loc = zeros(2)
+        while true
+            sampled_loc = [rand(rng, lat_dist), rand(rng, lon_dist)]
+            idxs, _ = knn(ztree, sampled_loc, 1)
+            zip = zstrs[idxs[1]]
+            if zip == income_zcode
+                break
+            end
+        end
+
+        push!(sites, (lat = sampled_loc[1], lon = sampled_loc[2]))
+    end # n in n_sites
+
+    return sites
+end

@@ -1,4 +1,5 @@
 data/
+*.DS_Store
 
 # These scripts are for hacking and plotting
 scripts/test_mult_agents_generic.jl
