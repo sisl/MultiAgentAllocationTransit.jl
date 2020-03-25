@@ -13,6 +13,7 @@ using StaticArrays
 # Registry repos
 using Distributions
 using Parameters
+using Infiltrator
 using JSON
 using CSV
 using DataFrames
@@ -24,6 +25,7 @@ using GLPK
 GLPK.jl_set_preemptive_check(false)
 using JuMP
 using LightGraphs
+using SparseArrays
 
 # Custom
 using TOML
