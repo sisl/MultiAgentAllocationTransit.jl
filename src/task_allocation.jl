@@ -48,12 +48,13 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
     model = Model(with_optimizer(GLPK.Optimizer))
     n_idxs = length(cost_vector)
 
+
     @variable(model, x[1:n_idxs]) # True for all edges
     @constraint(model, x .>= 0)
     @objective(model, Min, cost_vector' * x)
 
     # Add {0,1} constraint on package-depot / depot-package edges
-    depot_site_mask = zeros(n_depots*n_sites*2, n_idxs)
+    depot_site_mask = spzeros(n_depots*n_sites*2, n_idxs)
     for i = 1:n_depots # Depots
         for j = n_depots+1:n_depots+n_sites # Sites
             # Depot -> site
@@ -71,11 +72,13 @@ function min_connecting_tour(n_depots::Int64, n_sites::Int64,
             end
         end
     end
+    
+
     @constraint(model, depot_site_mask * x .<= ones(n_depots*n_sites*2)) # Depot<->site edges at most once
 
     # Now add constraints for out-edges and in-edges for sites
-    site_out_edge_mask = zeros(n_sites, n_idxs)
-    site_in_edge_mask = zeros(n_sites, n_idxs)
+    site_out_edge_mask = spzeros(n_sites, n_idxs)
+    site_in_edge_mask = spzeros(n_sites, n_idxs)
     for i = n_depots+1:n_depots+n_sites
 
         if isempty(out_nbrs[i])
