@@ -683,7 +683,7 @@ function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, ori
 
     vis = MAPFTransitGoalVisitor(env, Set{Int64}())
 
-    astar_eps_states, tgt_entry = a_star_epsilon_constrained_shortest_path_implicit!(env.state_graph,
+    astar_eps_states, tgt_entry = a_star_implicit_constrained_epsilon_path!(env.state_graph,
                                                                            edge_wt_fn,
                                                                            orig_idx, vis, weight,
                                                                            admissible_heuristic,

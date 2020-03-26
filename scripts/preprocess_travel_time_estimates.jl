@@ -34,7 +34,7 @@ function main()
     drone_params = parse_drone_params(drone_params_file)
 
     tg = load_transit_graph_latlong(stop_coords_file, trips_file, TRANSIT_CAP_RANGE, rng)
-    tg, stop_idx_to_trips, aug_trips_fws_dists, stops_nn_tree, nn_idx_to_stop =
+    tg, stop_idx_to_trips =
                     transit_graph_preprocessing(tg, MultiAgentAllocationTransit.distance_lat_lon_euclidean, drone_params)
 
 
@@ -53,10 +53,9 @@ function main()
 
     env = MAPFTransitEnv(off_transit_graph = dummy_otg, transit_graph = tg, state_graph = state_graph,
                          agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
-                         stops_nn_tree = stops_nn_tree, nn_idx_to_stop = nn_idx_to_stop, stop_idx_to_trips = stop_idx_to_trips,
-                         aug_trips_fws_dists = aug_trips_fws_dists, depot_to_sites_dists = Matrix{Float64}(undef, 0, 0),
+                         stop_idx_to_trips = stop_idx_to_trips, aug_trips_fws_dists = zeros(1, 1),
                          drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                         curr_site_points = [], threshold_global_conflicts = 0)
+                         curr_site_points = [], threshold_global_conflicts = 10)
 
     println("Computing estimates")
     @time travel_time_estimates = compute_all_pairs_estimates(env, n_halton_points, ECBS_WEIGHT)
