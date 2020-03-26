@@ -189,7 +189,7 @@ function compute_all_pairs_estimates(env::MAPFTransitEnv, n_halton_points::Int64
 
     travel_time_estimates = zeros(n_halton_points, n_halton_points)
 
-    for i = 1:n_halton_points
+    @sync for i = 1:n_halton_points
         println("From point $i:")
         for j = 1:n_halton_points
 
@@ -197,7 +197,8 @@ function compute_all_pairs_estimates(env::MAPFTransitEnv, n_halton_points::Int64
                 orig_str = string("d-", i)
                 goal_str = string("d-", j)
 
-                travel_time_estimates[i, j] = get_depot_to_site_travel_time!(env, weight, orig_str, goal_str)
+                envcp = deepcopy(env)
+                Threads.@spawn travel_time_estimates[i, j] = get_depot_to_site_travel_time!(envcp, weight, orig_str, goal_str)
             end
         end
     end
