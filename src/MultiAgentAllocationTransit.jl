@@ -107,7 +107,7 @@ export
     replan_individual!,
     replan_collective!,
     set_solution_diagnostics!,
-    get_depot_to_site_travel_time
+    get_depot_to_site_travel_time!
 
 
 include("types.jl")

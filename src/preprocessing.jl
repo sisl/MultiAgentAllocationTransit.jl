@@ -197,7 +197,7 @@ function compute_all_pairs_estimates(env::MAPFTransitEnv, n_halton_points::Int64
                 orig_str = string("d-", i)
                 goal_str = string("d-", j)
 
-                travel_time_estimates[i, j] = get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
+                travel_time_estimates[i, j] = get_depot_to_site_travel_time!(env, weight, orig_str, goal_str)
             end
         end
     end

@@ -660,11 +660,11 @@ function Graphs.include_vertex!(vis::MAPFTransitGoalVisitor, u::MAPFTransitVerte
 end
 
 """
-    get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
+    get_depot_to_site_travel_time!(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
 
 Runs a single search over a snapshot of the transit network to get the travel time. If not reachable, then return Inf
 """
-function get_depot_to_site_travel_time(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
+function get_depot_to_site_travel_time!(env::MAPFTransitEnv, weight::Float64, orig_str::String, goal_str::String)
 
     # Get origin idx and destination idx
     # No need to reset as must be zero
@@ -727,7 +727,7 @@ function allocation_cost_wrapper_truett(env::MAPFTransitEnv, weight::Float64, n_
         goal_str = string("d-", goal_ds_idx)
     end
 
-    return get_depot_to_site_travel_time(env, weight, orig_str, goal_str)
+    return get_depot_to_site_travel_time!(env, weight, orig_str, goal_str)
 end
 
 """
