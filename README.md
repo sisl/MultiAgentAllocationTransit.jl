@@ -73,4 +73,4 @@ The allocation and replanning benchmarks should be straightforward to reproduce.
 The one caveat is that for settings with l/m = 10, the trials would take very long much more often. Therefore, I reduced the `env.threshold_global_conflicts`
 from 10 to 5 while running benchmarks (the solver throws an exception after 5 high-level conflicts). At some point, I'll take a deeper dive into handling many high-level conflicts better, or just have more functionality for terminating easily.
 </br>
-In general, it is very important to me that anyone re-running this be able to reproduce numbers/results. Please email me at shushmanchoudhury@gmail.com if you have any issues or need any help.
+In general, it is very important to me that anyone re-running this be able to reproduce numbers/results. Please email me at shushman@cs.stanford.edu if you have any issues or need any help.
