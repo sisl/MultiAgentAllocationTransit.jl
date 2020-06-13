@@ -25,7 +25,6 @@ Here is another example, with 110 agents, in the Washington DC Metropolitan Area
 
 ## Setup and Notebook
 
-**Note** - Documentation in progress.
 For those of you familiar with the Julia package manager, I provide a `Manifest.toml` because there are two custom dependencies: my fork of [Graphs.jl](https://github.com/Shushman/Graphs.jl) (which has various extensions to A*
 with an implicit graph representation) and my [MultiAgentPathFinding.jl](https://github.com/Shushman/MultiAgentPathFinding.jl),
 which implements Enhanced CBS. You can also just `add` those repos directly and then `dev` this one, instead of
