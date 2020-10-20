@@ -32,7 +32,7 @@ instantiating the environment.
 Also, there are several moving parts to the code, and the two main units, graph search and multi-agent path finding have been tested themselves.
 Thus, I've been a bit lazy with testing here, but I might add some basic integration tests later.
 
-The `MultiAgentAllocationTransit` repository is set up as a package with its own environment in [Julia 1.0](https://julialang.org/downloads/). Look at **Using someone else's project** at the Julia [package manager documentation](https://julialang.github.io/Pkg.jl/v1/environments/#Using-someone-else's-project-1) for the basic idea. To get the code up and running (after having installed Julia), first `cd` into the `MultiAgentAllocationTransit` folder.
+The `MultiAgentAllocationTransit` repository is set up as a package with its own environment in [Julia](https://julialang.org/downloads/) (version 1.3 or later). Look at **Using someone else's project** at the Julia [package manager documentation](https://julialang.github.io/Pkg.jl/v1/environments/#Using-someone-else's-project-1) for the basic idea. To get the code up and running (after having installed Julia), first `cd` into the `MultiAgentAllocationTransit` folder.
 Then start the Julia REPL and go into [package manager](https://julialang.github.io/Pkg.jl/v1/getting-started/) mode by pressing `]`, followed by:
 ```shell
 (v1.0) pkg> activate .
