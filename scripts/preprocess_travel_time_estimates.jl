@@ -55,7 +55,7 @@ function main()
                          agent_states = AgentState[], depot_sites_to_vtx = depot_sites_to_vtx, trip_to_vtx_range = trip_to_vtx_range,
                          stop_idx_to_trips = stop_idx_to_trips, aug_trips_fws_dists = zeros(1, 1),
                          drone_params = drone_params, dist_fn = MultiAgentAllocationTransit.distance_lat_lon_euclidean,
-                         curr_site_points = [], threshold_global_conflicts = 10)
+                         curr_site_points = [], threshold_global_conflicts = 5)
 
     println("Computing estimates")
     @time travel_time_estimates = compute_all_pairs_estimates(env, n_halton_points, ECBS_WEIGHT)

@@ -21,7 +21,8 @@ const N_DEPOTS = parse(Int64, ARGS[3])
 const depots = [LatLonCoords((lat = rand(rng, lat_dist), lon = rand(rng, lon_dist))) for i = 1:N_DEPOTS]
 const N_AGENTS = N_DEPOTS
 
-const N_SITE_VALS = [50, 100, 200, 500, 1000, 5000]
+# const N_SITE_VALS = [50, 100, 200, 500, 1000, 5000]
+const N_SITE_VALS = [5000]
 
 for N_SITES in N_SITE_VALS
 
@@ -32,11 +33,12 @@ for N_SITES in N_SITE_VALS
 
     b = @benchmarkable task_allocation($N_DEPOTS, $N_SITES, $N_AGENTS, $depot_sites, $cost_fn) 
 
-    t = run(b) # Do once to trigger...something
-    t = run(b)
+    t = run(b, seconds=100000, samples=5) # Do once to trigger...something
+    # t = run(b)
 
     @show N_SITES
     @show mean(t.times)
+    @show dump(t)
 
     allocation_results = Dict("n_depots"=>N_DEPOTS, "n_agents"=>N_AGENTS, "site_stats"=>Dict())
     allocation_results["site_stats"][N_SITES] = Dict("mean" => mean(t.times),
