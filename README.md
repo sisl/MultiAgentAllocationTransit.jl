@@ -25,7 +25,6 @@ Here is another example, with 110 agents, in the Washington DC Metropolitan Area
 
 ## Setup and Notebook
 
-**Note** - Documentation in progress.
 For those of you familiar with the Julia package manager, I provide a `Manifest.toml` because there are two custom dependencies: my fork of [Graphs.jl](https://github.com/Shushman/Graphs.jl) (which has various extensions to A*
 with an implicit graph representation) and my [MultiAgentPathFinding.jl](https://github.com/Shushman/MultiAgentPathFinding.jl),
 which implements Enhanced CBS. You can also just `add` those repos directly and then `dev` this one, instead of
@@ -33,7 +32,7 @@ instantiating the environment.
 Also, there are several moving parts to the code, and the two main units, graph search and multi-agent path finding have been tested themselves.
 Thus, I've been a bit lazy with testing here, but I might add some basic integration tests later.
 
-The `MultiAgentAllocationTransit` repository is set up as a package with its own environment in [Julia 1.0](https://julialang.org/downloads/). Look at **Using someone else's project** at the Julia [package manager documentation](https://julialang.github.io/Pkg.jl/v1/environments/#Using-someone-else's-project-1) for the basic idea. To get the code up and running (after having installed Julia), first `cd` into the `MultiAgentAllocationTransit` folder.
+The `MultiAgentAllocationTransit` repository is set up as a package with its own environment in [Julia](https://julialang.org/downloads/) (version 1.3 or later). Look at **Using someone else's project** at the Julia [package manager documentation](https://julialang.github.io/Pkg.jl/v1/environments/#Using-someone-else's-project-1) for the basic idea. To get the code up and running (after having installed Julia), first `cd` into the `MultiAgentAllocationTransit` folder.
 Then start the Julia REPL and go into [package manager](https://julialang.github.io/Pkg.jl/v1/getting-started/) mode by pressing `]`, followed by:
 ```shell
 (v1.0) pkg> activate .
@@ -73,4 +72,4 @@ The allocation and replanning benchmarks should be straightforward to reproduce.
 The one caveat is that for settings with l/m = 10, the trials would take very long much more often. Therefore, I reduced the `env.threshold_global_conflicts`
 from 10 to 5 while running benchmarks (the solver throws an exception after 5 high-level conflicts). At some point, I'll take a deeper dive into handling many high-level conflicts better, or just have more functionality for terminating easily.
 </br>
-In general, it is very important to me that anyone re-running this be able to reproduce numbers/results. Please email me at shushmanchoudhury@gmail.com if you have any issues or need any help.
+In general, it is very important to me that anyone re-running this be able to reproduce numbers/results. Please file a Github issue if you need any assistance.

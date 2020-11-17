@@ -31,3 +31,4 @@ TravelingSalesmanHeuristics = "8c8f4381-2cdd-507c-846c-be2bcff6f45f"
 
 [compat]
 JuMP = "0.20"
+julia = ">= 1.3"
