@@ -22,7 +22,7 @@ using NearestNeighbors
 using GeometryTypes
 using IterTools
 using GLPK
-GLPK.jl_set_preemptive_check(false)
+# GLPK.jl_set_preemptive_check(false)
 using JuMP
 using LightGraphs
 using SparseArrays
