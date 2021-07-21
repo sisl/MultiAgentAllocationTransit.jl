@@ -260,7 +260,7 @@ version = "0.8.3"
 deps = ["DataStructures", "Parameters", "SparseArrays"]
 git-tree-sha1 = "51b568718996244125ebdd62b362a1ebb08145eb"
 repo-rev = "master"
-repo-url = "/home/shushman/.julia/dev/Graphs"
+repo-url = "https://github.com/Shushman/Graphs.jl.git"
 uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
 version = "0.10.3"
 
@@ -403,7 +403,7 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 deps = ["DataStructures", "Graphs", "JSON", "Parameters", "Random", "YAML"]
 git-tree-sha1 = "49ee98f835ebed793341c87f0aec14b0effacabc"
 repo-rev = "master"
-repo-url = "/home/shushman/.julia/dev/MultiAgentPathFinding"
+repo-url = "https://github.com/Shushman/MultiAgentPathFinding.jl.git"
 uuid = "42a2a06c-b1c1-11e9-17d7-43429d2d2199"
 version = "0.1.0"
 
