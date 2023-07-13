@@ -1,9 +1,8 @@
 # MultiAgentAllocationTransit
 
-Accompanying code repository for our ICRA 2020 submission 'Efficient Multi-Drone Delivery Using Transit Networks' ([arXiv](https://arxiv.org/abs/1909.11840)).
+Accompanying code repository for the paper [Efficient Multi-Drone Delivery Using Transit Networks](https://www.jair.org/index.php/jair/article/view/12450) (**ICRA 2020 Best Multi-Robot Finalist, Journal of AI Research 2021**).
 In this paper, we present a comprehensive algorithmic framework to operate a large fleet of drones to deliver
-packages in an urban area while using transit networks to enhance their effective range. Please see the extended
-version on ArXiv for the formulation, algorithms, experiments, and discussions.
+packages in an urban area while using transit networks to enhance their effective range.
 
 ### Illustrations
 
